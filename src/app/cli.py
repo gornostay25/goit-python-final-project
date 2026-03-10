@@ -4,6 +4,7 @@ from app import __version__, __authors__, __description__
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+from rich.table import Table
 from rich.live import Live
 from rich.align import Align
 from rich.layout import Layout
@@ -60,7 +61,7 @@ class PersonalAssistantCLI:
         """
         self.console = Console()
         self.console.set_window_title("Personal Assistant")
-        self.messages = []
+        self.messages: list[tuple[str, str | Table]] = []
 
     # Render methods
 
@@ -186,7 +187,12 @@ class PersonalAssistantCLI:
             )
 
         for msg_type, msg_text in self.messages:
-            self.console.print(self.__render_message(msg_type, msg_text))
+            if msg_type == "table":
+                self.console.line()
+                self.console.print(msg_text)
+            else:
+                self.console.print(self.__render_message(msg_type, msg_text))
+
             if msg_type != "command":
                 self.console.line()
 
@@ -323,6 +329,12 @@ class PersonalAssistantCLI:
 
         Displays all contacts in the address book.
         """
+        table = Table(title="Contacts")
+        table.add_column("Name", style="cyan", justify="left")
+        table.add_column("Phone", style="green", justify="left")
+        table.add_row("John Doe", "1234567890")
+        table.add_row("Jane Smith", "0987654321")
+        self.messages.append(("table", table))
         pass
 
     def __process_find_contact_command(self, args: list[str]):
@@ -497,15 +509,13 @@ class PersonalAssistantCLI:
         """
         Load content from files.
         """
-        print("Loading content from files...")
-        pass
+        self.console.print("[bold green]Loading content from files...[/bold green]")
 
     def save_content(self):
         """
         Save content to files.
         """
-        print("Saving content to files...")
-        pass
+        self.console.print("[bold green]Saving content to files...[/bold green]")
 
     def exit(self, code: int = 0):
         """
