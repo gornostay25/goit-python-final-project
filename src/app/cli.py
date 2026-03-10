@@ -265,9 +265,6 @@ class PersonalAssistantCLI:
                     continue
                 return value
             except KeyboardInterrupt:
-                self.console.print(
-                    self.__render_message("error", "Operation cancelled")
-                )
                 self.messages.append(("error", "Operation cancelled"))
                 break
         return None
@@ -307,7 +304,10 @@ class PersonalAssistantCLI:
             # TODO: Validate name and phone
         elif len(args) == 0:
             name = self.__input_field(
-                "Enter name", required=True, error_message="Name cannot be empty"
+                "Enter name",
+                required=True,
+                error_message="Name must be between 4 and 20 characters",
+                validator=lambda x: len(x) > 4 and len(x) < 20,
             )
             if not name:
                 return
