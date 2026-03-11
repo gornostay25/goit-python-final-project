@@ -190,7 +190,7 @@ class ContactBook:
 
     @staticmethod
     def validate_phone(phone: str) -> bool:
-        return bool(re.fullmatch(r"\d{10}", phone.strip()))
+        return bool(re.fullmatch(r"^\+\d{1,3}\d{9,14}$", phone.strip()))
 
     @staticmethod
     def validate_email(email: str) -> bool:
