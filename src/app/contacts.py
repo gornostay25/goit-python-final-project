@@ -1,119 +1,237 @@
 import re
+from dataclasses import dataclass, asdict
 from datetime import datetime
 
+EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+PHONE_REGEX = r"^\+\d{1,3}\d{9,14}$"
 
+
+@dataclass
 class Contact:
-    def __init__(
-        self,
-        name: str,
-        phone: str,
-        email: str = "",
-        address: str = "",
-        birthday: str = "",
-    ) -> None:
-        self.name = name
-        self.phone = phone
-        self.email = email
-        self.address = address
-        self.birthday = birthday
+    """Represents a contact in the address book.
+
+    Attributes:
+        name: Contact name (required).
+        phone: Contact phone number in international format.
+        email: Contact email address.
+        birthday: Contact birthday in DD.MM.YYYY format.
+        address: Contact physical address.
+    """
+
+    name: str
+    phone: str
+    email: str = ""
+    birthday: str = ""
+    address: str = ""
 
     def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "phone": self.phone,
-            "email": self.email,
-            "address": self.address,
-            "birthday": self.birthday,
-        }
+        """Convert contact to dictionary for serialization."""
+        return asdict(self)
 
-    @staticmethod
-    def from_dict(data: dict) -> "Contact":
-        return Contact(
+    @classmethod
+    def from_dict(cls, data: dict) -> "Contact":
+        """
+        Create Contact instance from dictionary.
+
+        Args:
+            data: Dictionary containing contact fields with optional values.
+
+        Returns:
+            Contact: New Contact instance with values from dict.
+        """
+        return cls(
             data.get("name", ""),
             data.get("phone", ""),
             data.get("email", ""),
-            data.get("address", ""),
             data.get("birthday", ""),
+            data.get("address", ""),
         )
 
-    def __str__(self) -> str:
-        email_text = self.email if self.email else "не вказано"
-        address_text = self.address if self.address else "не вказано"
-        birthday_text = self.birthday if self.birthday else "не вказано"
-        return (
-            f"Ім'я: {self.name}\n"
-            f"Телефон: {self.phone}\n"
-            f"Email: {email_text}\n"
-            f"Адреса: {address_text}\n"
-            f"День народження: {birthday_text}"
-        )
+    # region Validation methods
+    @staticmethod
+    def validate_name(name: str) -> bool:
+        """
+        Validate name contains only alphabetic characters and is not empty.
+
+        Args:
+            name: Contact name to validate.
+
+        Returns:
+            True if valid, False otherwise.
+        """
+        stripped_name = name.strip()
+        return stripped_name.isalpha() and len(stripped_name)
+
+    @staticmethod
+    def validate_phone(phone: str) -> bool:
+        """Validate phone number format.
+
+        Phone must match international format: + followed by 1-3 digits,
+        then 9-14 digits (e.g., +380123456789).
+
+        Args:
+            phone: Phone number to validate.
+
+        Returns:
+            True if format matches, False otherwise.
+        """
+        return bool(re.fullmatch(PHONE_REGEX, phone.strip()))
+
+    @staticmethod
+    def validate_email(email: str) -> bool:
+        """Validate email format.
+
+        Args:
+            email: Email address to validate.
+
+        Returns:
+            True if format matches, False otherwise.
+        """
+        return bool(re.fullmatch(EMAIL_REGEX, email.strip()))
+
+    @staticmethod
+    def validate_birthday(birthday: str) -> bool:
+        """Validate birthday format.
+
+        Birthday must be in DD.MM.YYYY format and represent a valid date.
+
+        Args:
+            birthday: Birthday string to validate.
+
+        Returns:
+            True if format matches and date is valid, False otherwise.
+        """
+        try:
+            datetime.strptime(birthday.strip(), "%d.%m.%Y")
+            return True
+        except ValueError:
+            return False
+
+    # endregion
 
 
 class ContactBook:
-    def __init__(self) -> None:
+    """Manages a collection of contacts with search and edit capabilities."""
+
+    def __init__(self):
+        """Initialize an empty contact book."""
         self.contacts: list[Contact] = []
 
-    def add_contact(
-        self,
-        name: str,
-        phone: str,
-        email: str = "",
-        address: str = "",
-        birthday: str = "",
-    ) -> str:
-        if not name.strip():
-            return "Ім'я не може бути порожнім"
+    def add(self, contact: Contact):
+        """Add a new contact to the address book.
 
-        if self.find_exact_contact(name):
-            return "Контакт з таким ім'ям уже існує"
-
-        if not self.validate_phone(phone):
-            return "Некоректний номер телефону. Введіть 10 цифр"
-
-        if email and not self.validate_email(email):
-            return "Некоректний email"
-
-        if birthday and not self.validate_birthday(birthday):
-            return "Некоректна дата народження. Формат: ДД.ММ.РРРР"
-
-        contact = Contact(
-            name.strip(),
-            phone.strip(),
-            email.strip(),
-            address.strip(),
-            birthday.strip(),
-        )
+        Args:
+            contact: Contact instance to add.
+        """
         self.contacts.append(contact)
-        return "Контакт додано"
 
-    def show_all_contacts(self) -> str:
-        if not self.contacts:
-            return "Список контактів порожній"
-        return "\n\n".join(str(contact) for contact in self.contacts)
+    def get_all(self):
+        """Return all contacts in the address book.
 
-    def find_exact_contact(self, name: str) -> Contact | None:
+        Returns:
+            List of all Contact instances.
+        """
+        return self.contacts
+
+    def find_exact(self, name: str) -> Contact | None:
+        """Find a contact by exact name match.
+
+        Args:
+            name: Contact name to search for.
+
+        Returns:
+            Contact instance if found, None otherwise.
+        """
         for contact in self.contacts:
-            if contact.name.lower() == name.lower():
+            if contact.name.casefold() == name.casefold():
                 return contact
         return None
 
-    def search_contacts(self, keyword: str) -> str:
-        keyword_lower = keyword.lower().strip()
-        found: list[str] = []
+    def find(self, search: str) -> list[Contact]:
+        """Find contacts matching search term across all fields.
+
+        Searches case-insensitively in name, email, address, and birthday,
+        and directly in phone number.
+
+        Args:
+            search: Search term to match against contact fields.
+
+        Returns:
+            List of matching Contact instances.
+        """
+        keywords = search.casefold().strip()
+        found: list[Contact] = []
+        for contact in self.contacts:
+            if keywords in contact.name.casefold():
+                found.append(contact)
+            elif keywords in contact.phone:
+                found.append(contact)
+            elif keywords in contact.email.casefold():
+                found.append(contact)
+            elif keywords in contact.address.casefold():
+                found.append(contact)
+            elif keywords in contact.birthday.casefold():
+                found.append(contact)
+        return found
+
+    def delete(self, name: str) -> bool:
+        """Delete a contact by name.
+
+        Args:
+            name: Contact name to delete.
+
+        Returns:
+            True if contact was found and deleted, False otherwise.
+        """
+        contact = self.find_exact(name)
+        if not contact:
+            return False
+        self.contacts.remove(contact)
+        return True
+
+    def upcoming_birthdays(self, days: int) -> list[dict]:
+        """Find contacts with birthdays within specified number of days.
+
+        Calculates birthdays for the current year or next year if already passed.
+
+        Args:
+            days: Number of days to look ahead (must be numeric).
+
+        Returns:
+            Formatted string of contacts with upcoming birthdays or message
+            if none found.
+        """
+
+        today = datetime.today().date()
+        result: list[dict] = []
 
         for contact in self.contacts:
-            if (
-                keyword_lower in contact.name.lower()
-                or keyword_lower in contact.phone
-                or keyword_lower in contact.email.lower()
-                or keyword_lower in contact.address.lower()
-                or keyword_lower in contact.birthday
-            ):
-                found.append(str(contact))
+            if not contact.birthday:
+                continue
+            try:
+                birthday_date = datetime.strptime(
+                    contact.birthday.strip(), "%d.%m.%Y"
+                ).date()
+            except ValueError:
+                continue
 
-        if not found:
-            return "Контакти не знайдено"
-        return "\n\n".join(found)
+            birthday_this_year = birthday_date.replace(year=today.year)
+            if birthday_this_year < today:
+                birthday_this_year = birthday_this_year.replace(year=today.year + 1)
+
+            delta_days = (birthday_this_year - today).days
+            if 0 <= delta_days <= days:
+                result.append(
+                    {
+                        "name": contact.name,
+                        "birthday": birthday_this_year.strftime("%d.%m.%Y"),
+                        "days": delta_days,
+                    }
+                )
+
+        return result
+
+    # OLD METHODS
 
     def edit_contact(
         self,
@@ -123,7 +241,21 @@ class ContactBook:
         new_address: str = "",
         new_birthday: str = "",
     ) -> str:
-        contact = self.find_exact_contact(name)
+        """Edit an existing contact's fields.
+
+        Validates each field before updating. Only non-empty fields are updated.
+
+        Args:
+            name: Contact name to edit.
+            new_phone: New phone number.
+            new_email: New email address.
+            new_address: New physical address.
+            new_birthday: New birthday in DD.MM.YYYY format.
+
+        Returns:
+            Success or error message.
+        """
+        contact = self.find_exact(name)
         if not contact:
             return "Контакт не знайдено"
 
@@ -147,65 +279,18 @@ class ContactBook:
 
         return "Контакт оновлено"
 
-    def delete_contact(self, name: str) -> str:
-        contact = self.find_exact_contact(name)
-        if not contact:
-            return "Контакт не знайдено"
-        self.contacts.remove(contact)
-        return "Контакт видалено"
-
-    def upcoming_birthdays(self, days: str | int) -> str:
-        if not str(days).strip().isdigit():
-            return "Кількість днів має бути числом"
-
-        days_int = int(days)
-        today = datetime.today().date()
-        result: list[str] = []
-
-        for contact in self.contacts:
-            if not contact.birthday:
-                continue
-            try:
-                birthday_date = datetime.strptime(
-                    contact.birthday.strip(), "%d.%m.%Y"
-                ).date()
-            except ValueError:
-                continue
-
-            birthday_this_year = birthday_date.replace(year=today.year)
-            if birthday_this_year < today:
-                birthday_this_year = birthday_this_year.replace(year=today.year + 1)
-
-            delta_days = (birthday_this_year - today).days
-            if 0 <= delta_days <= days_int:
-                result.append(
-                    f"{contact.name}\n"
-                    f"Дата дня народження: {birthday_this_year.strftime('%d.%m.%Y')}\n"
-                    f"Через: {delta_days} дн."
-                )
-
-        if not result:
-            return "Немає контактів з днем народження у вказаний період"
-        return "\n\n".join(result)
-
-    @staticmethod
-    def validate_phone(phone: str) -> bool:
-        return bool(re.fullmatch(r"^\+\d{1,3}\d{9,14}$", phone.strip()))
-
-    @staticmethod
-    def validate_email(email: str) -> bool:
-        return bool(re.fullmatch(r"^[\w\.-]+@[\w\.-]+\.\w+$", email.strip()))
-
-    @staticmethod
-    def validate_birthday(birthday: str) -> bool:
-        try:
-            datetime.strptime(birthday.strip(), "%d.%m.%Y")
-            return True
-        except ValueError:
-            return False
-
     def to_list(self) -> list[dict]:
+        """Convert all contacts to list of dictionaries.
+
+        Returns:
+            List of contact dictionaries.
+        """
         return [contact.to_dict() for contact in self.contacts]
 
     def load_from_list(self, data: list[dict]) -> None:
+        """Load contacts from list of dictionaries.
+
+        Args:
+            data: List of contact dictionaries to load.
+        """
         self.contacts = [Contact.from_dict(item) for item in data]
