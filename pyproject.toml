@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.15.5", "pre-commit>=4.5.1"]
+dev = ["ruff>=0.15.5", "pre-commit>=4.5.1", "pytest>=8.0.0", "pytest-cov>=5.0.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -100,3 +100,19 @@ skip-magic-trailing-comma = false
 
 # Like Black, automatically detect appropriate line ending.
 line-ending = "auto"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow-running tests",
+]

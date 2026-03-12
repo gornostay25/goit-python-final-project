@@ -8,14 +8,14 @@ This Personal Assistant is designed to help you manage your personal information
 
 ### Key Features
 
-<!-- TODO: Features will be implemented. Planned features include:
-
 - **Contact Management**
   - Store contacts with names, addresses, phone numbers, emails, and birthdays
   - Validate phone numbers and email addresses during entry
   - Search contacts by various criteria
   - Edit and delete contact records
   - Display upcoming birthdays within a specified number of days
+
+<!-- TODO: Features will be implemented. Planned features include:
 
 - **Notes Management**
   - Create and store text notes
@@ -37,6 +37,7 @@ This Personal Assistant is designed to help you manage your personal information
 ### Quick Start
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/gornostay25/goit-python-final-project.git
    cd goit-python-final-project
@@ -50,10 +51,10 @@ This Personal Assistant is designed to help you manage your personal information
 That's it! uv automatically creates a virtual environment (`.venv`) and installs all dependencies including dev dependencies (ruff, pre-commit). No manual activation needed when using `uv run`.
 
 To install only production dependencies (excluding dev tools), use:
+
 ```bash
 uv sync --no-dev
 ```
-
 
 ## Usage
 
@@ -70,9 +71,6 @@ Alternatively, run the script directly:
 ```bash
 uv run src/app/__main__.py
 ```
-
-
-<!-- TODO: Add example commands once functionality is implemented -->
 
 ## Development
 
@@ -93,7 +91,9 @@ goit-python-final-project/
 │   └── app/
 │       ├── __init__.py        # Package initialization
 │       ├── __main__.py        # Entry point
-│       └── cli.py             # CLI implementation
+│       ├── cli.py             # CLI implementation
+│       ├── contacts.py        # Contact models and ContactBook
+│       └── storage.py         # Data persistence layer
 └── tests/
     └── __init__.py            # Test package
 ```
@@ -101,6 +101,7 @@ goit-python-final-project/
 ### Development Setup
 
 1. Ensure dependencies are installed:
+
    ```bash
    uv sync
    ```
@@ -108,16 +109,19 @@ goit-python-final-project/
    Note: The dev dependency group is installed by default. Use `uv sync --no-dev` to exclude dev dependencies.
 
 2. Add new dependencies:
+
    ```bash
    uv add <package-name>
    ```
 
 3. Add development dependencies:
+
    ```bash
    uv add --dev <package-name>
    ```
 
 4. Run linting:
+
    ```bash
    uv run ruff check src/
    ```
@@ -134,6 +138,7 @@ This project uses [pre-commit](https://pre-commit.com/) for automated code quali
 To set up pre-commit hooks:
 
 1. Ensure dependencies are installed:
+
    ```bash
    uv sync
    ```
@@ -144,11 +149,13 @@ To set up pre-commit hooks:
    ```
 
 Now the hooks will run automatically before each commit. To run them manually:
-   ```bash
-   uv run pre-commit run --all-files
-   ```
+
+```bash
+uv run pre-commit run --all-files
+```
 
 The pre-commit configuration includes:
+
 - **ruff**: Python linter with auto-fix
 - **ruff-format**: Python code formatter
 - **General checks**: Trailing whitespace, end-of-file fixer, YAML validation, etc.
@@ -160,12 +167,13 @@ This project follows a simple Git workflow to maintain code quality:
 #### Branches
 
 - **main**: Production branch (protected, no direct pushes)
-- **feature/***: Feature implementation branches
-- **fix/***: Bugfix branches
+- **feature/\***: Feature implementation branches
+- **fix/\***: Bugfix branches
 
 #### Pull Request Workflow
 
 1. Create a new branch from `main`:
+
    ```bash
    # For a new feature
    git checkout main
@@ -179,6 +187,7 @@ This project follows a simple Git workflow to maintain code quality:
 2. Make your changes and commit them
 
 3. Push your branch:
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -201,6 +210,7 @@ This project uses GitHub Actions for automated code quality checks:
 #### Ruff CI
 
 The [`.github/workflows/ruff.yml`](.github/workflows/ruff.yml) workflow runs on:
+
 - Push to `main`, `feature/*`, `fix/*` branches
 - Pull requests to `main` branch
 
@@ -211,10 +221,11 @@ It automatically runs Ruff checks on your code to ensure code quality before mer
 ## Contributing
 
 This is a team project developed by:
+
 - [Volodymyr Palamar](https://gornostay25.dev)
 - [Liudmyla Slipko](https://github.com/slipkoliudmyla)
 - [Aurika](https://github.com/diagnosel)
-- [Daniil Kukhar](https://github.com/)
+- [Daniil Kukhar](https://github.com/DaniilKukhar)
 
 ### Contribution Guidelines
 
