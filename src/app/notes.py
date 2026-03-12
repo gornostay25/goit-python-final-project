@@ -1,30 +1,27 @@
+from dataclasses import dataclass, field
+
+
+@dataclass
 class Note:
     """
     Клас для зберігання однієї нотатки.
     """
 
-    def __init__(self, text, tags=None):
-        self.text = text
-        self.tags = tags if tags else []
+    text: str
+    tags: list[str] = field(default_factory=list)
 
     def to_dict(self):
         """
         Перетворює нотатку у словник для JSON.
         """
-        return {
-            "text": self.text,
-            "tags": self.tags
-        }
+        return {"text": self.text, "tags": self.tags}
 
     @staticmethod
     def from_dict(data):
         """
         Створює об'єкт Note зі словника.
         """
-        return Note(
-            data.get("text", ""),
-            data.get("tags", [])
-        )
+        return Note(data.get("text", ""), data.get("tags", []))
 
     def __str__(self):
         """
@@ -42,7 +39,7 @@ class NotesBook:
     def __init__(self):
         self.notes = []
 
-    def add_note(self, text, tags=None):
+    def add_note(self, text: str, tags: list[str] | None = None) -> str:
         """
         Додає нову нотатку.
         """
@@ -108,7 +105,9 @@ class NotesBook:
 
         sorted_notes = sorted(
             self.notes,
-            key=lambda note: ", ".join(tag.lower() for tag in note.tags) if note.tags else "zzz"
+            key=lambda note: (
+                ", ".join(tag.lower() for tag in note.tags) if note.tags else "zzz"
+            ),
         )
 
         result = []
