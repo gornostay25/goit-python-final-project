@@ -1,28 +1,64 @@
+from collections import UserList
 import re
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 PHONE_REGEX = r"^\+\d{1,3}\d{9,14}$"
+DATE_FORMAT = "%d.%m.%Y"
+
+
+class Birthday:
+    """Encapsulates birthday date with validation for contact entries.
+
+    Wraps datetime.date to provide consistent string representation
+    and DD.MM.YYYY format validation for user input.
+    """
+
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return datetime.strftime(self.value, DATE_FORMAT)
+
+    def __repr__(self):
+        return self.__str__()
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, new_value):
+        try:
+            if not new_value:
+                self._value = None
+                return
+            self._value = datetime.strptime(new_value, DATE_FORMAT).date()
+        except ValueError as e:
+            raise ValueError("Invalid date format. Use DD.MM.YYYY") from e
 
 
 @dataclass
 class Contact:
     """Represents a contact in the address book.
 
+    Stores personal information including name, phone, email, birthday,
+    and address.
+
     Attributes:
         name: Contact name (required).
-        phone: Contact phone number in international format.
-        email: Contact email address.
-        birthday: Contact birthday in DD.MM.YYYY format.
-        address: Contact physical address.
+        phone: Contact phone number in international format (required).
+        email: Contact email address (optional).
+        birthday: Contact birthday in DD.MM.YYYY format (optional).
+        address: Contact physical address (optional).
     """
 
     name: str
     phone: str
-    email: str = ""
-    birthday: str = ""
-    address: str = ""
+    email: str = None
+    birthday: Birthday = None
+    address: str = None
 
     def to_dict(self) -> dict:
         """Convert contact to dictionary for serialization."""
@@ -40,18 +76,17 @@ class Contact:
             Contact: New Contact instance with values from dict.
         """
         return cls(
-            data.get("name", ""),
-            data.get("phone", ""),
-            data.get("email", ""),
-            data.get("birthday", ""),
-            data.get("address", ""),
+            data.get("name"),
+            data.get("phone"),
+            data.get("email"),
+            Birthday(data.get("birthday")),
+            data.get("address"),
         )
 
     # region Validation methods
     @staticmethod
     def validate_name(name: str) -> bool:
-        """
-        Validate name contains only alphabetic characters and is not empty.
+        """Check name is not empty after stripping whitespace.
 
         Args:
             name: Contact name to validate.
@@ -59,15 +94,14 @@ class Contact:
         Returns:
             True if valid, False otherwise.
         """
-        stripped_name = name.strip()
-        return stripped_name.isalpha() and len(stripped_name)
+        return len(name.strip()) > 0
 
     @staticmethod
     def validate_phone(phone: str) -> bool:
         """Validate phone number format.
 
-        Phone must match international format: + followed by 1-3 digits,
-        then 9-14 digits (e.g., +380123456789).
+        Pattern ensures phone can be used globally: country code prefix
+        followed by 9-14 digits (E.164 standard).
 
         Args:
             phone: Phone number to validate.
@@ -102,7 +136,7 @@ class Contact:
             True if format matches and date is valid, False otherwise.
         """
         try:
-            datetime.strptime(birthday.strip(), "%d.%m.%Y")
+            datetime.strptime(birthday.strip(), DATE_FORMAT)
             return True
         except ValueError:
             return False
@@ -110,31 +144,18 @@ class Contact:
     # endregion
 
 
-class ContactBook:
-    """Manages a collection of contacts with search and edit capabilities."""
+class ContactBook(UserList[Contact]):
+    """Manages contact collection with search, edit, and birthday tracking.
 
-    def __init__(self):
-        """Initialize an empty contact book."""
-        self.contacts: list[Contact] = []
-
-    def add(self, contact: Contact):
-        """Add a new contact to the address book.
-
-        Args:
-            contact: Contact instance to add.
-        """
-        self.contacts.append(contact)
-
-    def get_all(self):
-        """Return all contacts in the address book.
-
-        Returns:
-            List of all Contact instances.
-        """
-        return self.contacts
+    Extends UserList to provide list-like access while adding domain-specific
+    operations for contact management.
+    """
 
     def find_exact(self, name: str) -> Contact | None:
-        """Find a contact by exact name match.
+        """Find contact by exact name match (case-insensitive).
+
+        Uses case-insensitive comparison for user convenience,
+        allowing variations like "John" or "john" to match.
 
         Args:
             name: Contact name to search for.
@@ -142,35 +163,36 @@ class ContactBook:
         Returns:
             Contact instance if found, None otherwise.
         """
-        for contact in self.contacts:
+        for contact in self.data:
             if contact.name.casefold() == name.casefold():
                 return contact
         return None
 
     def find(self, search: str) -> list[Contact]:
-        """Find contacts matching search term across all fields.
+        """Search all contact fields for matching terms.
 
-        Searches case-insensitively in name, email, address, and birthday,
-        and directly in phone number.
+        Performs case-insensitive substring search in text fields and
+        exact match on phone digits. Returns all matching contacts,
+        preserving order of discovery.
 
         Args:
             search: Search term to match against contact fields.
 
         Returns:
-            List of matching Contact instances.
+            List of matching Contact instances in order of discovery.
         """
         keywords = search.casefold().strip()
         found: list[Contact] = []
-        for contact in self.contacts:
+        for contact in self.data:
             if keywords in contact.name.casefold():
                 found.append(contact)
             elif keywords in contact.phone:
                 found.append(contact)
-            elif keywords in contact.email.casefold():
+            elif contact.email and keywords in contact.email.casefold():
                 found.append(contact)
-            elif keywords in contact.address.casefold():
+            elif contact.address and keywords in contact.address.casefold():
                 found.append(contact)
-            elif keywords in contact.birthday.casefold():
+            elif contact.birthday and keywords in str(contact.birthday):
                 found.append(contact)
         return found
 
@@ -186,36 +208,32 @@ class ContactBook:
         contact = self.find_exact(name)
         if not contact:
             return False
-        self.contacts.remove(contact)
+        self.data.remove(contact)
         return True
 
     def upcoming_birthdays(self, days: int) -> list[dict]:
-        """Find contacts with birthdays within specified number of days.
+        """Find contacts with birthdays occurring within the next N days.
 
-        Calculates birthdays for the current year or next year if already passed.
+        Calculates upcoming birthdays for the current year, wrapping to
+        next year if the birthday has already passed. This ensures we don't
+        miss birthdays that occurred earlier in the year.
 
         Args:
-            days: Number of days to look ahead (must be numeric).
+            days: Number of days to look ahead (must be positive).
 
         Returns:
-            Formatted string of contacts with upcoming birthdays or message
-            if none found.
+            List of dictionaries with name, birthday date, and days until.
         """
 
         today = datetime.today().date()
         result: list[dict] = []
 
-        for contact in self.contacts:
-            if not contact.birthday:
-                continue
-            try:
-                birthday_date = datetime.strptime(
-                    contact.birthday.strip(), "%d.%m.%Y"
-                ).date()
-            except ValueError:
+        for contact in self.data:
+            if not contact.birthday or not contact.birthday.value:
                 continue
 
-            birthday_this_year = birthday_date.replace(year=today.year)
+            # Calculate birthday for this year, then next year if passed
+            birthday_this_year = contact.birthday.value.replace(year=today.year)
             if birthday_this_year < today:
                 birthday_this_year = birthday_this_year.replace(year=today.year + 1)
 
@@ -231,66 +249,55 @@ class ContactBook:
 
         return result
 
-    # OLD METHODS
+    def edit(self, name: str, fields: dict) -> bool:
+        """Update contact fields with validated values.
 
-    def edit_contact(
-        self,
-        name: str,
-        new_phone: str = "",
-        new_email: str = "",
-        new_address: str = "",
-        new_birthday: str = "",
-    ) -> str:
-        """Edit an existing contact's fields.
-
-        Validates each field before updating. Only non-empty fields are updated.
+        Only updates fields that are present and non-empty in the dictionary.
+        All validation should be performed by the caller before calling this method.
 
         Args:
             name: Contact name to edit.
-            new_phone: New phone number.
-            new_email: New email address.
-            new_address: New physical address.
-            new_birthday: New birthday in DD.MM.YYYY format.
+            fields: Dictionary containing fields to update with keys:
+                    'phone', 'email', 'address', 'birthday'.
 
         Returns:
-            Success or error message.
+            True if contact was found and updated, False otherwise.
         """
         contact = self.find_exact(name)
         if not contact:
-            return "Контакт не знайдено"
+            return False
 
-        if new_phone:
-            if not self.validate_phone(new_phone):
-                return "Некоректний номер телефону. Введіть 10 цифр"
-            contact.phone = new_phone.strip()
+        if "phone" in fields and fields["phone"]:
+            contact.phone = fields["phone"].strip()
 
-        if new_email:
-            if not self.validate_email(new_email):
-                return "Некоректний email"
-            contact.email = new_email.strip()
+        if "email" in fields and fields["email"]:
+            contact.email = fields["email"].strip()
 
-        if new_address:
-            contact.address = new_address.strip()
+        if "address" in fields and fields["address"]:
+            contact.address = fields["address"].strip()
 
-        if new_birthday:
-            if not self.validate_birthday(new_birthday):
-                return "Некоректна дата народження. Формат: ДД.ММ.РРРР"
-            contact.birthday = new_birthday.strip()
+        if "birthday" in fields and fields["birthday"]:
+            contact.birthday = Birthday(fields["birthday"])
 
-        return "Контакт оновлено"
+        return True
 
     def to_list(self) -> list[dict]:
-        """Convert all contacts to list of dictionaries.
+        """Convert all contacts to list of dictionaries for serialization.
+
+        Enables easy JSON export and persistence of contact data.
 
         Returns:
-            List of contact dictionaries.
+            List of contact dictionaries with all field values.
         """
-        return [contact.to_dict() for contact in self.contacts]
+        return [contact.to_dict() for contact in self.data]
 
     def load_from_list(self, data: list[dict]) -> None:
-        """Load contacts from list of dictionaries.
+        """Load contacts from list of dictionaries for deserialization.
+
+        Replaces existing contact data with the provided data. Used to
+        restore contacts from persistent storage like JSON files.
 
         Args:
             data: List of contact dictionaries to load.
         """
-        self.contacts = [Contact.from_dict(item) for item in data]
+        self.data = [Contact.from_dict(item) for item in data]

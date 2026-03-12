@@ -11,8 +11,9 @@ from rich.layout import Layout
 from time import sleep
 from difflib import get_close_matches
 from shlex import split as shlex_split
-
 from app.contacts import Contact, ContactBook
+from functools import wraps
+
 
 AVAILABLE_COMMANDS = [
     "add-contact",
@@ -44,19 +45,40 @@ ERROR_MESSAGES = {
 }
 
 
+def handle_operation_errors(func):
+    """Decorate command handlers to catch and display errors gracefully.
+
+    Prevents unhandled exceptions from crashing the CLI and provides
+    consistent error messaging. Special handling for OperationCancelledError
+    (user interruption with Ctrl+C) to avoid displaying error messages.
+
+    Returns:
+        Decorated function that catches exceptions and adds error messages.
+    """
+
+    @wraps(func)
+    def inner(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except OperationCancelledError:
+            # User cancelled - no error message needed
+            return
+        except Exception as e:
+            self.messages.append(("error", f"Error: {str(e)}"))
+            return
+
+    return inner
+
+
 class PersonalAssistantCLI:
     """Command-line interface for the Personal Assistant application.
 
-    This class handles all CLI interactions including rendering the UI,
-    processing user input, and executing commands.
+    Provides a Rich-based TUI with colored output, tables, and styled
+    messages. Handles both command-line arguments and interactive input.
     """
 
     def __init__(self):
-        """Initialize the Personal Assistant CLI.
-
-        Sets up the console window with title and initializes the messages list
-        for command history tracking.
-        """
+        """Initialize CLI with Rich console and empty message history."""
         self.console = Console()
         self.console.set_window_title("Personal Assistant")
         self.messages: list[tuple[str, str | Table]] = []
@@ -65,11 +87,10 @@ class PersonalAssistantCLI:
 
     # region Render methods
     def __render_message(self, msg_type: str, msg_text: str) -> Text:
-        """
-        Render a message to the console with appropriate styling.
+        """Apply color styling to messages based on type.
 
         Args:
-            msg_type: Type of message ("command", "response", "error", "info").
+            msg_type: Message type ("command", "response", "error", "info").
             msg_text: The text content to render.
 
         Returns:
@@ -86,11 +107,10 @@ class PersonalAssistantCLI:
         return Text(msg_text)
 
     def __show_startup_screen(self):
-        """
-        Display splash screen with project information and countdown before main loop.
+        """Display splash screen with project info and countdown.
 
-        Shows project details, authors, and countdown to create visual introduction
-        before entering the main application loop.
+        Creates visual introduction using Rich Layout with ASCII logo,
+        project description, and animated countdown before entering main loop.
         """
         TIMEOUT_SEC = 3
         layout = Layout()
@@ -169,10 +189,10 @@ class PersonalAssistantCLI:
                 sleep(1)
 
     def __show_console(self):
-        """
-        Display message history to the console.
+        """Display message history in terminal.
 
-        Renders all stored messages; shows welcome message if no messages exist yet.
+        Renders all stored messages; shows welcome message if no history exists.
+        Tables are rendered directly, other messages get styling applied.
         """
         if len(self.messages) == 0:
             self.messages.append(
@@ -189,6 +209,7 @@ class PersonalAssistantCLI:
             else:
                 self.console.print(self.__render_message(msg_type, msg_content))
 
+            # Skip spacing after command echo for cleaner look
             if msg_type != "command":
                 self.console.line()
 
@@ -213,11 +234,10 @@ class PersonalAssistantCLI:
 
     # region Input methods
     def __input_command(self) -> str:
-        """
-        Prompt user for command input and return stripped result.
+        """Prompt for command input and return stripped value.
 
         Returns:
-            str or None: The user's command, or None if input is empty.
+            The user's command, or None if input is empty.
         """
         command = self.console.input(
             "[bold yellow]Enter command: [/bold yellow]"
@@ -232,42 +252,41 @@ class PersonalAssistantCLI:
         optional: bool = False,
         error_message: str = "Invalid input",
         validator: callable = None,
-        default_value: str = None,
     ) -> str:
-        """
-        Prompt user for field input with optional validation.
+        """Prompt for field input with optional validation and cancellation.
 
-        Loops until valid input received or user cancels with KeyboardInterrupt.
+        Loops until valid input received or user cancels with Ctrl+C.
+        Empty input is allowed for optional fields.
 
         Args:
-            prompt: Message to display as the input prompt.
-            optional: Whether the field can be left empty.
-            error_message: Message to display on validation failure.
-            validator: Optional callable function to validate input.
-            default_value: Default value to return if provided.
+            prompt: Message to display as input prompt.
+            optional: Whether field can be left empty.
+            error_message: Message shown on validation failure.
+            validator: Optional callable to validate input.
 
         Returns:
-            str: The validated input value, or default value if provided.
+            The validated input value.
 
         Raises:
-            OperationCancelledError: If user interrupts the input process.
+            OperationCancelledError: If user interrupts with Ctrl+C.
         """
         while True:
             try:
-                value = self.console.input(
+                str_value = self.console.input(
                     f"[bold yellow]{prompt}{' (optional)' if optional else ''}: [/bold yellow]"
                 ).strip()
-                # If not optional and no value, show error message
-                if not optional and not value:
+                # Required fields must not be empty
+                if not optional and not str_value:
                     self.console.print(
                         self.__render_message("error", "Value cannot be empty")
                     )
                     continue
-                # If optional and no value do not validate
-                if value and validator and not validator(value):
+                # Validate non-empty values if validator provided
+                if str_value and validator and not validator(str_value):
                     self.console.print(self.__render_message("error", error_message))
                     continue
-                return default_value if default_value else value
+
+                return str_value
             except KeyboardInterrupt:
                 self.messages.append(("error", "Operation cancelled"))
                 raise OperationCancelledError
@@ -277,18 +296,18 @@ class PersonalAssistantCLI:
     # region Process command methods
 
     # region Contact methods
+    @handle_operation_errors
     def __process_add_contact_command(self, args: list[str]) -> str:
-        """
-        Process add-contact command in CLI or interactive mode.
+        """Add new contact via CLI args or interactive prompts.
 
-        Supports both CLI arguments (name phone [email] [birthday] [address])
-        and interactive prompts for contact details.
+        Supports both direct arguments (name phone [email] [birthday] [address])
+        and interactive input for each field.
 
         Args:
-            args: Command arguments containing contact details. If empty, prompts for input.
+            args: Command arguments. If empty, prompts interactively.
 
         Returns:
-            str: Contact information or None on cancellation.
+            Contact information or None on cancellation.
         """
         data = {
             "name": None,
@@ -297,7 +316,7 @@ class PersonalAssistantCLI:
             "birthday": None,
             "address": None,
         }
-        # If arguments are provided in command line, validate them
+        # CLI mode: parse arguments directly
         if len(args) >= 2 and len(args) <= 5:
             name, phone, *rest = args
             # Validate required fields
@@ -313,8 +332,8 @@ class PersonalAssistantCLI:
                 self.messages.append(("error", ERROR_MESSAGES["contacts"]["phone"]))
                 return
 
-            # Validate optional fields
-            if rest[0]:
+            # Validate optional fields only if provided
+            if len(rest) >= 1 and rest[0]:
                 email = rest[0]
                 if Contact.validate_email(email):
                     data["email"] = email
@@ -322,7 +341,7 @@ class PersonalAssistantCLI:
                     self.messages.append(("error", ERROR_MESSAGES["contacts"]["email"]))
                     return
 
-            if rest[1]:
+            if len(rest) >= 2 and rest[1]:
                 birthday = rest[1]
                 if Contact.validate_birthday(birthday):
                     data["birthday"] = birthday
@@ -332,7 +351,7 @@ class PersonalAssistantCLI:
                     )
                     return
 
-            if rest[2]:
+            if len(rest) >= 3 and rest[2]:
                 address = rest[2]
                 if address:
                     data["address"] = address
@@ -342,73 +361,68 @@ class PersonalAssistantCLI:
                     )
                     return
 
-        # If no arguments are provided, prompt for input
+        # Interactive mode: prompt for each field
         elif len(args) == 0:
-            try:
-                data["name"] = self.__input_field(
-                    "Enter name",
-                    error_message=ERROR_MESSAGES["contacts"]["name"],
-                    validator=Contact.validate_name,
-                )
+            data["name"] = self.__input_field(
+                "Enter name",
+                error_message=ERROR_MESSAGES["contacts"]["name"],
+                validator=Contact.validate_name,
+            )
 
-                data["phone"] = self.__input_field(
-                    "Enter phone",
-                    error_message=ERROR_MESSAGES["contacts"]["phone"],
-                    validator=Contact.validate_phone,
-                )
+            data["phone"] = self.__input_field(
+                "Enter phone",
+                error_message=ERROR_MESSAGES["contacts"]["phone"],
+                validator=Contact.validate_phone,
+            )
 
-                data["email"] = self.__input_field(
-                    "Enter email",
-                    optional=True,
-                    error_message=ERROR_MESSAGES["contacts"]["email"],
-                    validator=Contact.validate_email,
-                )
+            email = self.__input_field(
+                "Enter email",
+                optional=True,
+                error_message=ERROR_MESSAGES["contacts"]["email"],
+                validator=Contact.validate_email,
+            )
+            data["email"] = email if email else None
 
-                data["birthday"] = self.__input_field(
-                    "Enter birthday",
-                    optional=True,
-                    error_message=ERROR_MESSAGES["contacts"]["birthday"],
-                    validator=Contact.validate_birthday,
-                )
+            birthday = self.__input_field(
+                "Enter birthday",
+                optional=True,
+                error_message=ERROR_MESSAGES["contacts"]["birthday"],
+                validator=Contact.validate_birthday,
+            )
+            data["birthday"] = birthday if birthday else None
 
-                data["address"] = self.__input_field(
-                    "Enter address",
-                    optional=True,
-                    error_message=ERROR_MESSAGES["contacts"]["address"],
-                )
-            except OperationCancelledError:
-                return
-            except Exception as e:
-                self.messages.append(("error", str(e)))
-                return
+            data["address"] = self.__input_field(
+                "Enter address",
+                optional=True,
+                error_message=ERROR_MESSAGES["contacts"]["address"],
+            )
 
-        # Show error message if invalid number of arguments
         else:
+            # Invalid number of arguments
             self.messages.append(
                 (
                     "error",
-                    "Usage: add-contact <name> <phone> <email> <address> <birthday>",
+                    "Usage: add-contact <name> <phone> [email] [birthday] [address]",
                 )
             )
             return
 
         contact = Contact.from_dict(data)
-        self.contact_book.add(contact)
+        self.contact_book.append(contact)
         self.messages.append(
             (
                 "response",
-                f'Contact "{data["name"]}" added with phone "{data["phone"]}" {data["email"]} {data["birthday"]} {data["address"]}',
+                f'Contact "{data["name"]}" added with phone "{data["phone"]}" {data["email"] or ""} {data["birthday"] or ""} {data["address"] or ""}',
             )
         )
         return
 
     def __process_show_contacts_command(self):
-        """
-        Display all contacts from the address book in a table.
+        """Display all contacts in a formatted table.
 
-        Shows message if no contacts exist.
+        Shows empty message if no contacts exist.
         """
-        contacts = self.contact_book.get_all()
+        contacts = self.contact_book.data
         if not contacts:
             self.messages.append(("response", "No contacts found"))
             return
@@ -423,19 +437,19 @@ class PersonalAssistantCLI:
                 contact.name,
                 contact.phone,
                 contact.email,
-                contact.birthday,
+                str(contact.birthday) if contact.birthday else "",
                 contact.address,
             )
         self.messages.append(("table", table))
 
+    @handle_operation_errors
     def __process_find_contact_command(self, args: list[str]):
-        """
-        Find contacts matching search term across all fields.
+        """Search contacts by matching term across all fields.
 
         Args:
             args: Command arguments containing search term.
 
-        Searches contacts by name, phone, email, birthday, or address and displays results.
+        Displays results in table, or message if no matches found.
         """
         data = {
             "search": None,
@@ -466,32 +480,144 @@ class PersonalAssistantCLI:
                 contact.name,
                 contact.phone,
                 contact.email,
-                contact.birthday,
+                str(contact.birthday) if contact.birthday else "",
                 contact.address,
             )
         self.messages.append(("table", table))
 
+    @handle_operation_errors
     def __process_edit_contact_command(self, args: list[str]):
-        """
-        Edit an existing contact's information.
+        """Edit contact fields via CLI args or interactive prompts.
+
+        Supports direct arguments (name [phone] [email] [birthday] [address])
+        or interactive mode that shows current values before editing.
 
         Args:
-            args: Command arguments containing contact details.
+            args: Command arguments. If empty, prompts interactively.
         """
-        pass
+        fields = {
+            "phone": None,
+            "email": None,
+            "birthday": None,
+            "address": None,
+        }
+        # CLI mode: parse arguments
+        if len(args) >= 1 and len(args) <= 5:
+            name, *rest = args
+            contact = self.contact_book.find_exact(name)
+            if not contact:
+                self.messages.append(("error", f'Contact "{name}" not found'))
+                return
 
+            # Validate optional fields only if provided
+            if len(rest) >= 1 and rest[0]:
+                email = rest[0]
+                if Contact.validate_email(email):
+                    fields["email"] = email
+                else:
+                    self.messages.append(("error", ERROR_MESSAGES["contacts"]["email"]))
+                    return
+
+            if len(rest) >= 2 and rest[1]:
+                birthday = rest[1]
+                if Contact.validate_birthday(birthday):
+                    fields["birthday"] = birthday
+                else:
+                    self.messages.append(
+                        ("error", ERROR_MESSAGES["contacts"]["birthday"])
+                    )
+                    return
+
+            if len(rest) >= 3 and rest[2]:
+                address = rest[2]
+                if address:
+                    fields["address"] = address
+                else:
+                    self.messages.append(
+                        ("error", ERROR_MESSAGES["contacts"]["address"])
+                    )
+                    return
+
+        # Interactive mode: show current values and prompt for changes
+        elif len(args) == 0:
+            name = self.__input_field(
+                "Enter name",
+                error_message=ERROR_MESSAGES["contacts"]["name"],
+                validator=Contact.validate_name,
+            )
+            contact = self.contact_book.find_exact(name)
+            if not contact:
+                self.messages.append(("error", f'Contact "{name}" not found'))
+                return
+
+            self.console.print(
+                self.__render_message(
+                    "info",
+                    f"\nEditing contact: {name}\n"
+                    f"Current phone: {contact.phone}\n"
+                    f"Current email: {contact.email or 'Not set'}\n"
+                    f"Current birthday: {str(contact.birthday) if contact.birthday else 'Not set'}\n"
+                    f"Current address: {contact.address or 'Not set'}\n",
+                )
+            )
+            phone = self.__input_field(
+                "Enter phone",
+                optional=True,
+                error_message=ERROR_MESSAGES["contacts"]["phone"],
+                validator=Contact.validate_phone,
+            )
+            fields["phone"] = phone if phone else None
+
+            email = self.__input_field(
+                "Enter email",
+                optional=True,
+                error_message=ERROR_MESSAGES["contacts"]["email"],
+                validator=Contact.validate_email,
+            )
+            fields["email"] = email if email else None
+
+            birthday = self.__input_field(
+                "Enter birthday",
+                optional=True,
+                error_message=ERROR_MESSAGES["contacts"]["birthday"],
+                validator=Contact.validate_birthday,
+            )
+            fields["birthday"] = birthday if birthday else None
+
+            address = self.__input_field(
+                "Enter address",
+                optional=True,
+            )
+            fields["address"] = address if address else None
+
+        else:
+            # Invalid number of arguments
+            self.messages.append(
+                (
+                    "error",
+                    "Usage: edit-contact <name> [phone] [email] [birthday] [address]",
+                )
+            )
+            return
+
+        # Update contact using the edit method
+        if self.contact_book.edit(name, fields):
+            self.messages.append(("response", f'Contact "{name}" updated'))
+        else:
+            self.messages.append(("error", f'Contact "{name}" not found'))
+
+    @handle_operation_errors
     def __process_delete_contact_command(self, args: list[str]):
-        """
-        Remove contact from address book by name.
+        """Delete contact from address book by name.
 
         Args:
-            args: Command arguments containing contact identifier.
+            args: Command arguments containing contact name.
         """
         data = {
             "name": None,
         }
-        if len(args) == 1:
-            name = args[0]
+        if len(args) >= 1:
+            name = " ".join(args)
             if Contact.validate_name(name):
                 data["name"] = name
             else:
@@ -513,14 +639,14 @@ class PersonalAssistantCLI:
             self.messages.append(("error", f'Contact "{data["name"]}" not found'))
         return
 
+    @handle_operation_errors
     def __process_birthdays_command(self, args: list[str]):
-        """
-        Display upcoming birthdays within specified day range.
+        """Show upcoming birthdays within specified day range.
 
         Args:
-            args: Optional arguments for filtering birthday range.
+            args: Optional arguments for day range. Defaults to prompt.
 
-        Shows contacts with birthdays occurring within the next N days.
+        Displays contacts with birthdays occurring in the next N days.
         """
         data = {
             "days": None,
@@ -559,8 +685,7 @@ class PersonalAssistantCLI:
 
     # region Note methods
     def __process_add_note_command(self, args: list[str]):
-        """
-        Create a new note.
+        """Create new note.
 
         Args:
             args: Command arguments containing note content.
@@ -568,14 +693,11 @@ class PersonalAssistantCLI:
         pass
 
     def __process_show_notes_command(self):
-        """
-        Display all notes.
-        """
+        """Display all notes in address book."""
         pass
 
     def __process_find_note_command(self, args: list[str]):
-        """
-        Find notes matching search term.
+        """Search notes by content or tags.
 
         Args:
             args: Command arguments containing search term.
@@ -583,8 +705,7 @@ class PersonalAssistantCLI:
         pass
 
     def __process_edit_note_command(self, args: list[str]):
-        """
-        Edit an existing note.
+        """Edit existing note content.
 
         Args:
             args: Command arguments containing note identifier.
@@ -592,8 +713,7 @@ class PersonalAssistantCLI:
         pass
 
     def __process_delete_note_command(self, args: list[str]):
-        """
-        Remove a note.
+        """Remove note from storage.
 
         Args:
             args: Command arguments containing note identifier.
@@ -601,8 +721,7 @@ class PersonalAssistantCLI:
         pass
 
     def __process_find_tag_command(self, args: list[str]):
-        """
-        Find notes with specific tag.
+        """Find notes with specific tag.
 
         Args:
             args: Command arguments containing tag name.
@@ -610,31 +729,26 @@ class PersonalAssistantCLI:
         pass
 
     def __process_sort_notes_by_tags_command(self):
-        """
-        Display notes sorted by tags.
-        """
+        """Display notes grouped by tags."""
         pass
 
     # endregion
 
     def __process_help_command(self):
-        """
-        Display list of all available commands with their names.
-        """
+        """Display all available commands for quick reference."""
         help_text = "Available commands:\n"
         for command in AVAILABLE_COMMANDS:
             help_text += f"- {command}\n"
         self.messages.append(("response", help_text))
 
     def __process_command(self, command_str: str) -> str:
-        """
-        Parse command string and route to appropriate handler.
+        """Parse command string and dispatch to appropriate handler.
 
         Args:
             command_str: Raw command string from user input.
 
         Returns:
-            str: Command status or None.
+            Command status or None.
         """
         command, *args = shlex_split(command_str)
         match command.lower():
@@ -693,8 +807,7 @@ class PersonalAssistantCLI:
         self.console.print("[bold green]Saving content to files...[/bold green]")
 
     def exit(self, code: int = 0):
-        """
-        Exit the application with specified exit code.
+        """Exit the application cleanly with specified code.
 
         Args:
             code: Exit code to return (default: 0 for success).
@@ -704,11 +817,10 @@ class PersonalAssistantCLI:
         exit(code)
 
     def run(self):
-        """
-        Run the main application loop.
+        """Main application loop.
 
-        Continuously prompts for commands, processes them, and displays results
-        until the user exits.
+        Displays startup screen, then continuously prompts for commands,
+        processes them, and displays results until user exits.
         """
         self.__show_startup_screen()
 
@@ -740,7 +852,7 @@ def suggest_command(user_command):
         user_command: The command string to match against available commands.
 
     Returns:
-        str or None: The closest matching command, or None if no match found.
+        The closest matching command, or None if no match found.
     """
     matches = get_close_matches(user_command, AVAILABLE_COMMANDS, n=1, cutoff=0.5)
     if matches:
