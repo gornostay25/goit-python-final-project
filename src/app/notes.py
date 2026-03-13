@@ -34,7 +34,7 @@ class Note:
         """
         if not self.tags:
             return "zzz_no_tags"
-        return ", ".join(sorted(tag for tag in self.tags))
+        return self.tags_str
 
     # Only __lt__ is required for sorting; other comparison operators unnecessary
     def __lt__(self, other: "Note") -> bool:
@@ -72,7 +72,7 @@ class Note:
         Returns:
             Comma-separated string of tags, or empty string if no tags.
         """
-        return ", ".join(self.tags)
+        return ", ".join(sorted(tag for tag in self.tags))
 
     def to_dict(self):
         """Convert note to dictionary for serialization.

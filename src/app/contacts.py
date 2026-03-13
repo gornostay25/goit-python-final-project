@@ -5,7 +5,7 @@ from datetime import datetime
 from app.book import Book
 
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-PHONE_REGEX = r"^\+\d{1,3}\d{9,14}$"
+PHONE_REGEX = r"^\+\d{1,3}\d{9,11}$"
 DATE_FORMAT = "%d.%m.%Y"
 
 
@@ -18,6 +18,15 @@ class Birthday:
 
     def __init__(self, value):
         self.value = value
+
+    def __eq__(self, value: object, /) -> bool:
+        if isinstance(value, Birthday):
+            return self.value == value.value
+        if isinstance(value, datetime.date):
+            return self.value == value
+        if isinstance(value, str):
+            return self.value == datetime.strptime(value, DATE_FORMAT).date()
+        return False
 
     def __str__(self):
         return self.value.strftime(DATE_FORMAT) if self.value else ""
@@ -32,7 +41,7 @@ class Birthday:
     @value.setter
     def value(self, new_value):
         try:
-            if not new_value:
+            if not new_value or not new_value.strip():
                 self._value = None
                 return
             self._value = datetime.strptime(new_value, DATE_FORMAT).date()
