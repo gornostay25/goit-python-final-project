@@ -260,7 +260,7 @@ class ContactBook(UserList[Contact]):
         Args:
             name: Contact name to edit.
             fields: Dictionary containing fields to update with keys:
-                    'phone', 'email', 'address', 'birthday'.
+                    'name', 'phone', 'email', 'address', 'birthday'.
 
         Returns:
             True if contact was found and updated, False otherwise.
@@ -268,6 +268,13 @@ class ContactBook(UserList[Contact]):
         contact = self.find_exact(name)
         if not contact:
             return False
+
+        if "name" in fields and fields["name"]:
+            new_name = fields["name"].strip()
+            existing = self.find_exact(new_name)
+            if existing and existing != contact:
+                return False
+            contact.name = new_name
 
         if "phone" in fields and fields["phone"]:
             contact.phone = fields["phone"].strip()

@@ -496,6 +496,7 @@ class PersonalAssistantCLI:
             args: Command arguments. If empty, prompts interactively.
         """
         fields = {
+            "name": None,
             "phone": None,
             "email": None,
             "birthday": None,
@@ -560,6 +561,14 @@ class PersonalAssistantCLI:
                     f"Current address: {contact.address or 'Not set'}\n",
                 )
             )
+            new_name = self.__input_field(
+                "Enter new name (leave empty to keep current)",
+                optional=True,
+                error_message=ERROR_MESSAGES["contacts"]["name"],
+                validator=Contact.validate_name,
+            )
+            fields["name"] = new_name if new_name else None
+
             phone = self.__input_field(
                 "Enter phone",
                 optional=True,
