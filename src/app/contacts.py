@@ -19,7 +19,7 @@ class Birthday:
         self.value = value
 
     def __str__(self):
-        return datetime.strftime(self.value, DATE_FORMAT)
+        return self.value.strftime(DATE_FORMAT) if self.value else ""
 
     def __repr__(self):
         return self.__str__()
@@ -151,22 +151,23 @@ class ContactBook(UserList[Contact]):
     operations for contact management.
     """
 
-    def find_exact(self, name: str) -> Contact | None:
-        """Find contact by exact name match (case-insensitive).
-
-        Uses case-insensitive comparison for user convenience,
-        allowing variations like "John" or "john" to match.
+    def get(self, index: int | str) -> Contact | None:
+        """Get contact by index.
 
         Args:
-            name: Contact name to search for.
+            index: Contact index to get.
 
         Returns:
             Contact instance if found, None otherwise.
         """
-        for contact in self.data:
-            if contact.name.casefold() == name.casefold():
-                return contact
-        return None
+        if isinstance(index, str) and index.isdigit():
+            index = int(index)
+        elif not isinstance(index, int):
+            return None
+
+        if index < 1 or index > len(self.data):
+            return None
+        return self.data[index - 1]
 
     def find(self, search: str) -> list[Contact]:
         """Search all contact fields for matching terms.
@@ -196,7 +197,7 @@ class ContactBook(UserList[Contact]):
                 found.append(contact)
         return found
 
-    def delete(self, name: str) -> bool:
+    def delete(self, index: int | str) -> bool:
         """Delete a contact by name.
 
         Args:
@@ -205,7 +206,7 @@ class ContactBook(UserList[Contact]):
         Returns:
             True if contact was found and deleted, False otherwise.
         """
-        contact = self.find_exact(name)
+        contact = self.get(index)
         if not contact:
             return False
         self.data.remove(contact)
@@ -249,7 +250,7 @@ class ContactBook(UserList[Contact]):
 
         return result
 
-    def edit(self, name: str, fields: dict) -> bool:
+    def edit(self, index: int | str, fields: dict) -> bool:
         """Update contact fields with validated values.
 
         Only updates fields that are present and non-empty in the dictionary.
@@ -263,9 +264,12 @@ class ContactBook(UserList[Contact]):
         Returns:
             True if contact was found and updated, False otherwise.
         """
-        contact = self.find_exact(name)
+        contact = self.get(index)
         if not contact:
             return False
+
+        if "name" in fields and fields["name"]:
+            contact.name = fields["name"].strip()
 
         if "phone" in fields and fields["phone"]:
             contact.phone = fields["phone"].strip()
@@ -301,3 +305,14 @@ class ContactBook(UserList[Contact]):
             data: List of contact dictionaries to load.
         """
         self.data = [Contact.from_dict(item) for item in data]
+
+    def validate_index(self, index: str) -> bool:
+        """Validate index format.
+
+        Args:
+            index: Index to validate.
+
+        Returns:
+            True if index is a number greater than 0, False otherwise.
+        """
+        return index.isdigit() and int(index) > 0 and int(index) <= len(self.data)
