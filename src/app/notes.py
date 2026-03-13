@@ -37,7 +37,7 @@ class Note:
         return self.tags_str
 
     # Only __lt__ is required for sorting; other comparison operators unnecessary
-    def __lt__(self, other: "Note") -> bool:
+    def __lt__(self, other: "Note", /) -> bool:
         """Compare notes for sorting based on tags.
 
         Notes are sorted alphabetically by their concatenated tags.

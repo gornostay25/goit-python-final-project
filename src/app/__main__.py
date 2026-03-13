@@ -5,41 +5,41 @@ from app.contacts import Contact, ContactBook
 from app.notes import Note, NotesBook
 
 test_contacts = [
-    Contact(
-        name="John Doe",
-        phone="+1234567890",
-        email="john.doe@example.com",
-        birthday="01.01.1990",
-        address="123 Main St, Anytown, USA",
-    ),
-    Contact(
-        name="Jane Doe",
-        phone="+1234567891",
-        email="jane.doe@example.com",
-        birthday="02.02.1991",
-        address="456 Main St, Anytown, USA",
-    ),
-    Contact(
-        name="Jim Doe",
-        phone="+1234567892",
-        email="jim.doe@example.com",
-        birthday="03.03.1992",
-        address="789 Main St, Anytown, USA",
-    ),
-    Contact(
-        name="Jill Doe",
-        phone="+1234567893",
-        email="jill.doe@example.com",
-        birthday="04.04.1993",
-        address="101 Main St, Anytown, USA",
-    ),
-    Contact(
-        name="Jack Doe",
-        phone="+1234567894",
-        email="jack.doe@example.com",
-        birthday="05.05.1994",
-        address="123 Main St, Anytown, USA",
-    ),
+    {
+        "name": "John Doe",
+        "phone": "+1234567890",
+        "email": "john.doe@example.com",
+        "birthday": "01.01.1990",
+        "address": "123 Main St, Anytown, USA",
+    },
+    {
+        "name": "Jane Doe",
+        "phone": "+1234567891",
+        "email": "jane.doe@example.com",
+        "birthday": "02.02.1991",
+        "address": "456 Main St, Anytown, USA",
+    },
+    {
+        "name": "Jim Doe",
+        "phone": "+1234567892",
+        "email": "jim.doe@example.com",
+        "birthday": "03.03.1992",
+        "address": "789 Main St, Anytown, USA",
+    },
+    {
+        "name": "Jill Doe",
+        "phone": "+1234567893",
+        "email": "jill.doe@example.com",
+        "birthday": "04.04.1993",
+        "address": "101 Main St, Anytown, USA",
+    },
+    {
+        "name": "Jack Doe",
+        "phone": "+1234567894",
+        "email": "jack.doe@example.com",
+        "birthday": "05.05.1994",
+        "address": "123 Main St, Anytown, USA",
+    },
 ]
 
 test_notes = [
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     cli.load_content()
 
     if len(contact_book) == 0:
-        for contact in test_contacts:
-            contact_book.append(contact)
+        for contact_data in test_contacts:
+            contact_book.append(Contact.from_dict(contact_data))
 
     if len(note_book) == 0:
         for note in test_notes:
