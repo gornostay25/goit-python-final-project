@@ -12,7 +12,10 @@ from time import sleep
 from difflib import get_close_matches
 from shlex import split as shlex_split
 from app.contacts import Contact, ContactBook
+from app.notes import NotesBook
+from app.storage import load_data, save_data, CONTACTS_FILE, NOTES_FILE
 from functools import wraps
+from pathlib import Path
 
 
 AVAILABLE_COMMANDS = [
@@ -84,6 +87,8 @@ class PersonalAssistantCLI:
         self.messages: list[tuple[str, str | Table]] = []
 
         self.contact_book = ContactBook()
+        self.notes_book = NotesBook()
+        self.data_dir = Path.home() / ".personal_assistant"
 
     # region Render methods
     def __render_message(self, msg_type: str, msg_text: str) -> Text:
@@ -694,24 +699,46 @@ class PersonalAssistantCLI:
 
     # region Note methods
     def __process_add_note_command(self, args: list[str]):
-        """Create new note.
+        """Create new note with optional tags.
 
         Args:
             args: Command arguments containing note content.
         """
-        pass
+        if len(args) >= 1:
+            text = " ".join(args)
+            tags = []
+        else:
+            text = self.__input_field("Enter note text")
+            if not text:
+                return
+            tags_input = self.__input_field(
+                "Enter tags (comma separated)", optional=True
+            )
+            tags = [t.strip() for t in tags_input.split(",")] if tags_input else []
+
+        result = self.notes_book.add_note(text, tags)
+        self.messages.append(("response", result))
 
     def __process_show_notes_command(self):
-        """Display all notes in address book."""
-        pass
+        """Display all notes."""
+        result = self.notes_book.show_all_notes()
+        self.messages.append(("response", result))
 
     def __process_find_note_command(self, args: list[str]):
-        """Search notes by content or tags.
+        """Search notes by content.
 
         Args:
             args: Command arguments containing search term.
         """
-        pass
+        if len(args) >= 1:
+            keyword = " ".join(args)
+        else:
+            keyword = self.__input_field("Enter search keyword")
+            if not keyword:
+                return
+
+        result = self.notes_book.find_notes(keyword)
+        self.messages.append(("response", result))
 
     def __process_edit_note_command(self, args: list[str]):
         """Edit existing note content.
@@ -719,7 +746,26 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing note identifier.
         """
-        pass
+        if len(args) >= 1:
+            index = args[0]
+            new_text = " ".join(args[1:]) if len(args) > 1 else ""
+            new_tags = None
+        else:
+            index = self.__input_field("Enter note number")
+            if not index:
+                return
+            new_text = self.__input_field(
+                "Enter new text (leave empty to keep)", optional=True
+            )
+            tags_input = self.__input_field(
+                "Enter new tags (comma separated, leave empty to keep)", optional=True
+            )
+            new_tags = (
+                [t.strip() for t in tags_input.split(",")] if tags_input else None
+            )
+
+        result = self.notes_book.edit_note(index, new_text, new_tags)
+        self.messages.append(("response", result))
 
     def __process_delete_note_command(self, args: list[str]):
         """Remove note from storage.
@@ -727,7 +773,15 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing note identifier.
         """
-        pass
+        if len(args) >= 1:
+            index = args[0]
+        else:
+            index = self.__input_field("Enter note number to delete")
+            if not index:
+                return
+
+        result = self.notes_book.delete_note(index)
+        self.messages.append(("response", result))
 
     def __process_find_tag_command(self, args: list[str]):
         """Find notes with specific tag.
@@ -735,11 +789,20 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing tag name.
         """
-        pass
+        if len(args) >= 1:
+            tag = " ".join(args)
+        else:
+            tag = self.__input_field("Enter tag to search")
+            if not tag:
+                return
+
+        result = self.notes_book.find_by_tag(tag)
+        self.messages.append(("response", result))
 
     def __process_sort_notes_by_tags_command(self):
-        """Display notes grouped by tags."""
-        pass
+        """Display notes sorted by tags."""
+        result = self.notes_book.sort_by_tags()
+        self.messages.append(("response", result))
 
     # endregion
 
@@ -807,13 +870,30 @@ class PersonalAssistantCLI:
         """
         Load contact and note data from persistent storage.
         """
-        self.console.print("[bold green]Loading content from files...[/bold green]")
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        contacts_file = self.data_dir / CONTACTS_FILE
+        notes_file = self.data_dir / NOTES_FILE
+
+        contacts_data = load_data(str(contacts_file))
+        self.contact_book.load_from_list(contacts_data)
+
+        notes_data = load_data(str(notes_file))
+        self.notes_book.load_from_list(notes_data)
+
+        self.console.print("[bold green]Data loaded successfully[/bold green]")
 
     def save_content(self):
         """
         Save contact and note data to persistent storage.
         """
-        self.console.print("[bold green]Saving content to files...[/bold green]")
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        contacts_file = self.data_dir / CONTACTS_FILE
+        notes_file = self.data_dir / NOTES_FILE
+
+        save_data(str(contacts_file), self.contact_book.to_list())
+        save_data(str(notes_file), self.notes_book.to_list())
+
+        self.console.print("[bold green]Data saved successfully[/bold green]")
 
     def exit(self, code: int = 0):
         """Exit the application cleanly with specified code.

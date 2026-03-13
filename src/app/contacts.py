@@ -1,6 +1,6 @@
 from collections import UserList
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime
 
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
@@ -64,7 +64,13 @@ class Contact:
 
     def to_dict(self) -> dict:
         """Convert contact to dictionary for serialization."""
-        return asdict(self)
+        return {
+            "name": self.name,
+            "phone": self.phone,
+            "email": self.email,
+            "birthday": str(self.birthday) if self.birthday else None,
+            "address": self.address,
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> "Contact":
