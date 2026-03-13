@@ -436,9 +436,9 @@ class PersonalAssistantCLI:
             table.add_row(
                 contact.name,
                 contact.phone,
-                contact.email,
+                contact.email or "",
                 str(contact.birthday) if contact.birthday else "",
-                contact.address,
+                contact.address or "",
             )
         self.messages.append(("table", table))
 
@@ -479,9 +479,9 @@ class PersonalAssistantCLI:
             table.add_row(
                 contact.name,
                 contact.phone,
-                contact.email,
+                contact.email or "",
                 str(contact.birthday) if contact.birthday else "",
-                contact.address,
+                contact.address or "",
             )
         self.messages.append(("table", table))
 
