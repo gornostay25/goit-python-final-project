@@ -1,7 +1,5 @@
 """Tests for utils module - utility functions and decorators."""
 
-from unittest.mock import MagicMock, Mock
-
 import pytest
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document

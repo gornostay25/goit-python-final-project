@@ -1,10 +1,10 @@
 """Tests for contacts module - Contact, Birthday, and ContactBook classes."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pytest
 
-from app.contacts import Birthday, Contact, ContactBook
+from app.contacts import Birthday, Contact
 
 
 class TestBirthday:

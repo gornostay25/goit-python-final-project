@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.notes import Note, NotesBook
+from app.notes import Note
 
 
 class TestNoteValidation:

@@ -1,12 +1,12 @@
 """Tests for cli module - PersonalAssistantCLI class."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from app.cli import PersonalAssistantCLI
-from app.contacts import Contact, ContactBook
-from app.notes import Note, NotesBook
+from app.contacts import ContactBook
+from app.notes import NotesBook
 
 
 class TestCLIInitialization:
