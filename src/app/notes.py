@@ -5,17 +5,29 @@ from app.book import Book
 
 @dataclass()
 class Note:
+    """Represents a text note with optional tags.
+
+    Notes support text content and categorization via tags. Tags are
+    automatically cleaned (stripped, lowercased, deduplicated) on creation.
+    Notes can be sorted by tags for organized display.
+
+    Attributes:
+        text: Note text content (required).
+        tags: List of tag strings for categorization (optional, defaults to empty list).
+    """
+
     text: str
     tags: list[str] = field(default_factory=list)
 
     def __post_init__(self):
+        """Clean tags after dataclass initialization."""
         self.tags = self._clean_tags(self.tags)
 
     def _sort_key(self) -> str:
         """Generate sort key for comparing notes by tags.
 
         Notes are sorted alphabetically by their concatenated tags.
-        Notes without tags are sorted last (use "zzz" as key).
+        Notes without tags are sorted last (use "zzz_no_tags" as key).
 
         Returns:
             Sort key string for tag-based ordering.
@@ -24,49 +36,121 @@ class Note:
             return "zzz_no_tags"
         return ", ".join(sorted(tag for tag in self.tags))
 
-    # No need to implement __le__, __gt__, __ge__ because sort
+    # Only __lt__ is required for sorting; other comparison operators unnecessary
     def __lt__(self, other: "Note") -> bool:
-        """Compare notes for less-than based on tags."""
+        """Compare notes for sorting based on tags.
+
+        Notes are sorted alphabetically by their concatenated tags.
+        Notes without tags are placed at the end of sorted list.
+
+        Args:
+            other: Another Note instance to compare against.
+
+        Returns:
+            True if this note should come before the other note in sorted order.
+        """
         return self._sort_key() < other._sort_key()
 
     @property
     def title(self) -> str:
+        """Generate short title from note text.
+
+        Takes the first line of text and truncates to 10 characters.
+        Used for compact display in tables and lists.
+
+        Returns:
+            Short title string for display purposes.
+        """
         return self.text.split("\n")[0][:10].strip()
 
     @property
     def tags_str(self) -> str:
+        """Format tags as comma-separated string.
+
+        Provides human-readable representation of tags for display.
+
+        Returns:
+            Comma-separated string of tags, or empty string if no tags.
+        """
         return ", ".join(self.tags)
 
     def to_dict(self):
+        """Convert note to dictionary for serialization.
+
+        Uses dataclass asdict() to convert all fields to
+        dictionary format suitable for JSON storage.
+
+        Returns:
+            Dictionary containing note text and tags.
+        """
         return asdict(self)
 
     @classmethod
     def from_dict(cls, data):
+        """Create Note instance from dictionary.
+
+        Reconstructs note from serialized data. Handles missing fields
+        gracefully with defaults.
+
+        Args:
+            data: Dictionary containing 'text' and optional 'tags' fields.
+
+        Returns:
+            New Note instance with values from dict.
+        """
         return cls(data.get("text", ""), data.get("tags", []))
 
     @staticmethod
     def _clean_tags(tags: list[str] | None = None) -> list[str]:
+        """Normalize tags by cleaning and deduplicating.
+
+        Strips whitespace, converts to lowercase, removes empty strings,
+        and eliminates duplicates while preserving insertion order.
+        Ensures consistent tag format across all notes.
+
+        Args:
+            tags: List of tag strings to clean, or None.
+
+        Returns:
+            List of cleaned, normalized tag strings.
+        """
         if not tags:
             return []
-        # Strip, lowercase, filter empty, and remove duplicates while preserving order
         return list(
             dict.fromkeys(tag.strip().casefold() for tag in tags if tag.strip())
         )
 
     @staticmethod
     def validate_text(text: str) -> bool:
+        """Validate that note text is not empty.
+
+        Args:
+            text: Note text to validate.
+
+        Returns:
+            True if text contains non-whitespace characters, False otherwise.
+        """
         return len(text.strip()) > 0
 
 
 class NotesBook(Book[Note]):
+    """Manages note collection with search, edit, and tag-based sorting.
+
+    Extends Book to provide list-like access while adding domain-specific
+    operations for note management including text search and tag filtering.
+    """
+
     def get(self, index: int | str) -> Note | None:
-        """Get contact by index.
+        """Retrieve note by 1-based index.
+
+        Handles both string and integer indices, converting them to
+        internal 0-based position automatically.
 
         Args:
-            index: Contact index to get.
+            index: 1-based index of note to retrieve.
 
         Returns:
-            Contact instance if found, None otherwise.
+            Note instance if found, None otherwise.
         """
         if isinstance(index, str) and index.isdigit():
             index = int(index)
@@ -78,6 +162,17 @@ class NotesBook(Book[Note]):
         return self.data[index - 1]
 
     def find(self, search: str) -> list[Note]:
+        """Search notes by text content or tags.
+
+        Performs case-insensitive substring search in note text
+        and tag names. Returns all notes that match the search term.
+
+        Args:
+            search: Search term to match against note text and tags.
+
+        Returns:
+            List of Note instances with matching text or tags.
+        """
         keywords = search.casefold().strip()
         found: list[Note] = []
         for note in self.data:
@@ -107,6 +202,20 @@ class NotesBook(Book[Note]):
         return found
 
     def edit(self, index: int | str, fields: dict) -> bool:
+        """Update note fields with validated values.
+
+        Only updates fields that are present and non-empty in the dictionary.
+        This partial update pattern allows editing specific note attributes
+        without requiring full note data.
+
+        Args:
+            index: 1-based index of note to edit.
+            fields: Dictionary containing fields to update. Valid keys:
+                    'text', 'tags'.
+
+        Returns:
+            True if note was found and updated, False otherwise.
+        """
         note = self.get(index)
         if not note:
             return False
@@ -120,7 +229,12 @@ class NotesBook(Book[Note]):
         return True
 
     def load_from_list(self, data):
+        """Load notes from list of dictionaries for deserialization.
+
+        Replaces existing note data with provided data. Used to
+        restore notes from persistent storage like JSON files.
+
+        Args:
+            data: List of note dictionaries to load.
         """
-        Завантажує нотатки зі списку словників.
-        """
-        self.notes = [Note.from_dict(item) for item in data]
+        self.data = [Note.from_dict(item) for item in data]

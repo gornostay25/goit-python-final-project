@@ -222,12 +222,13 @@ class ContactBook(Book[Contact]):
         """Update contact fields with validated values.
 
         Only updates fields that are present and non-empty in the dictionary.
-        All validation should be performed by the caller before calling this method.
+        This partial update pattern allows editing specific contact attributes
+        without requiring full contact data.
 
         Args:
-            name: Contact name to edit.
-            fields: Dictionary containing fields to update with keys:
-                    'phone', 'email', 'address', 'birthday'.
+            index: 1-based index of contact to edit.
+            fields: Dictionary containing fields to update. Valid keys:
+                    'name', 'phone', 'email', 'address', 'birthday'.
 
         Returns:
             True if contact was found and updated, False otherwise.

@@ -45,7 +45,7 @@ class PersonalAssistantCLI:
         contact_book: ContactBook = ContactBook(),
         note_book: NotesBook = NotesBook(),
     ):
-        """Initialize CLI with Rich console, prompt_toolkit session, and empty message history."""
+        """Initialize CLI components and data books."""
         self.console = Console()
         self.console.set_window_title("Personal Assistant")
         self.messages: list[tuple[str, RenderableType]] = []
@@ -53,7 +53,6 @@ class PersonalAssistantCLI:
         self.contact_book = contact_book
         self.note_book = note_book
 
-        # Initialize prompt_toolkit session with history and autocompletion
         history = InMemoryHistory()
         completer = CommandCompleter(
             [cmd[0] for cmd in AVAILABLE_COMMANDS], COMMAND_SIGNATURES
@@ -211,6 +210,14 @@ class PersonalAssistantCLI:
         self.console.line()
 
     def __render_contacts_table(self, contacts: list[Contact]):
+        """Render contacts data into a Rich table.
+
+        Args:
+            contacts: List of Contact objects to display.
+
+        Returns:
+            Configured Rich Table with contact information.
+        """
         table = Table(
             title="Contacts",
             show_lines=True,
@@ -231,6 +238,14 @@ class PersonalAssistantCLI:
         return table
 
     def __render_birthdays_table(self, upcoming_birthdays: list[dict]):
+        """Render upcoming birthdays data into a Rich table.
+
+        Args:
+            upcoming_birthdays: List of dictionaries with birthday information.
+
+        Returns:
+            Configured Rich Table with upcoming birthdays.
+        """
         table = Table(title="Upcoming Birthdays")
         table.add_column("Name", style="cyan", justify="left")
         table.add_column("Birthday", style="magenta", justify="left")
@@ -240,6 +255,14 @@ class PersonalAssistantCLI:
         return table
 
     def __render_notes_table(self, notes: list[Note]):
+        """Render notes data into a Rich table.
+
+        Args:
+            notes: List of Note objects to display.
+
+        Returns:
+            Configured Rich Table with note information.
+        """
         table = Table(
             title="Notes",
             show_lines=True,
@@ -254,6 +277,14 @@ class PersonalAssistantCLI:
         return table
 
     def __render_note_details(self, note: Note):
+        """Render a single note with markdown content and tags.
+
+        Args:
+            note: Note object to display.
+
+        Returns:
+            Rich Panel containing the formatted note.
+        """
         return Panel(
             Markdown(note.text),
             subtitle=f"Tags: {note.tags_str}" if len(note.tags) > 0 else None,
@@ -293,10 +324,14 @@ class PersonalAssistantCLI:
         Empty input is allowed for optional fields.
 
         Args:
-            prompt: Message to display as input prompt.
+            message: Message to display as input prompt.
             optional: Whether field can be left empty.
             error_message: Message shown on validation failure.
             validator: Optional callable to validate input.
+            placeholder: Placeholder text for the input field.
+            default: Default value for the input field.
+            multiline: Whether to enable multiline input mode.
+            lexer: Pygments lexer for syntax highlighting.
 
         Returns:
             The validated input value.
@@ -443,7 +478,6 @@ class PersonalAssistantCLI:
             )
 
         else:
-            # Invalid number of arguments
             self.messages.append(
                 (
                     "error",
@@ -642,7 +676,6 @@ class PersonalAssistantCLI:
             fields["address"] = address if address else None
 
         else:
-            # Invalid number of arguments
             self.messages.append(
                 (
                     "error",
@@ -651,7 +684,6 @@ class PersonalAssistantCLI:
             )
             return
 
-        # Update contact using the edit method
         if self.contact_book.edit(index, fields):
             self.messages.append(("response", f'Contact "{contact.name}" updated'))
         else:
@@ -713,7 +745,6 @@ class PersonalAssistantCLI:
         data = {
             "days": None,
         }
-        # Parse days from command line arguments if provided
         if len(args) == 1:
             days = args[0]
             if days.isdigit() and int(days) > 0:
@@ -721,7 +752,6 @@ class PersonalAssistantCLI:
             else:
                 self.messages.append(("error", ERROR_MESSAGES["contacts"]["days"]))
                 return
-        # Otherwise prompt interactively for the day range
         elif len(args) == 0:
             data["days"] = int(
                 self.__input_field(
@@ -758,7 +788,6 @@ class PersonalAssistantCLI:
             "text": None,
             "tags": [],
         }
-        # CLI mode: parse arguments directly
         if len(args) == 2:
             text, tags = args
             if Note.validate_text(text):
@@ -815,7 +844,6 @@ class PersonalAssistantCLI:
         index = None
         max_index = len(self.note_book.data)
 
-        # If index is provided, show the note details
         if len(args) == 1 and max_index > 0:
             index = args[0]
             if self.note_book.validate_index(index):
@@ -827,7 +855,6 @@ class PersonalAssistantCLI:
                 )
                 return
 
-        # Otherwise, show all notes
         notes = self.note_book.data
         if not notes:
             self.messages.append(("response", "No notes found"))
@@ -948,7 +975,6 @@ class PersonalAssistantCLI:
             fields["tags"] = tags if tags else None
 
         else:
-            # Invalid number of arguments
             self.messages.append(
                 (
                     "error",
@@ -957,7 +983,6 @@ class PersonalAssistantCLI:
             )
             return
 
-        # Update contact using the edit method
         if self.note_book.edit(index, fields):
             self.messages.append(("response", f'Note "{note.title}" updated'))
         else:

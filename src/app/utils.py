@@ -1,3 +1,14 @@
+"""Utility functions and constants for the Personal Assistant CLI.
+
+Provides:
+- Command definitions and signatures for autocomplete
+- Error message templates
+- Custom exception for operation cancellation
+- Command completer for prompt_toolkit
+- Decorator for error handling
+- Command suggestion utility using fuzzy matching
+"""
+
 from difflib import get_close_matches
 from functools import wraps
 
@@ -64,13 +75,27 @@ ERROR_MESSAGES = {
 
 
 class OperationCancelledError(Exception):
-    """Exception raised when the user cancels an operation."""
+    """Exception raised when the user cancels an operation.
+
+    Used to distinguish between user-initiated cancellations (Ctrl+C)
+    and actual errors. Allows graceful handling of interrupted operations
+    without displaying error messages.
+    """
 
     pass
 
 
 class CommandCompleter(Completer):
-    """Custom completer that shows commands initially and arguments after space."""
+    """Custom completer for command names and their argument signatures.
+
+    Provides contextual autocompletion:
+    - Shows all commands when typing the first word
+    - Shows matching commands during partial command input
+    - Displays command signature after space to guide argument entry
+
+    This enhances CLI usability by reducing the need to remember exact
+    command syntax or refer to documentation.
+    """
 
     def __init__(self, commands, signatures):
         """Initialize with commands and their argument signatures.
@@ -94,21 +119,18 @@ class CommandCompleter(Completer):
         text = document.text_before_cursor
         words = text.strip().split()
 
-        # No command typed yet - show all commands
         if len(words) == 0:
             for completion in self.word_completer.get_completions(
                 document, complete_event
             ):
                 yield completion
 
-        # First word (command) typed, no space yet - show matching commands
         elif len(words) == 1 and not text.endswith(" "):
             for completion in self.word_completer.get_completions(
                 document, complete_event
             ):
                 yield completion
 
-        # Command typed and space pressed - show its signature
         else:
             command = words[0].lower()
             if command in self.signatures:
