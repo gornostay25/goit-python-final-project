@@ -114,3 +114,47 @@ class TestCLIPublicMethods:
         mock_print.assert_called_once()
         call_args = str(mock_print.call_args)
         assert "Saving content" in call_args
+
+
+class TestCommandParsingErrors:
+    """Tests for handling malformed command input."""
+
+    @pytest.mark.parametrize(
+        "malformed_command",
+        [
+            "\\",  # Single backslash
+            '"',  # Unclosed double quote
+            "'",  # Unclosed single quote
+        ],
+    )
+    def test_malformed_command_shows_error_message(self, malformed_command):
+        """Test that malformed input (like unclosed quotes) shows a user-friendly error."""
+        # Arrange
+        cli = PersonalAssistantCLI()
+
+        # Act
+        # This call should NOT raise an exception
+        cli._PersonalAssistantCLI__handle_command(malformed_command)
+
+        # Assert
+        # 1. An error message should have been added to the messages list.
+        assert len(cli.messages) == 1
+        # 2. The message should be the specific error we defined.
+        assert cli.messages[0] == ("error", "Invalid command")
+
+    @patch("app.cli.shlex_split")
+    def test_unexpected_exception_during_parsing_is_caught(self, mock_shlex_split):
+        """Test that any unexpected exception during parsing is caught and reported."""
+        # Arrange
+        cli = PersonalAssistantCLI()
+        # Force shlex_split to raise a generic, unexpected exception
+        mock_shlex_split.side_effect = RuntimeError("Unexpected disk failure!")
+
+        # Act
+        cli._PersonalAssistantCLI__handle_command("any command")
+
+        # Assert
+        assert len(cli.messages) == 1
+        assert cli.messages[0][0] == "error"
+        # Check that the exception message is included in the output
+        assert "Unexpected disk failure!" in cli.messages[0][1]

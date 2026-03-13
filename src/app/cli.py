@@ -1108,7 +1108,16 @@ class PersonalAssistantCLI:
         Returns:
             Command status or None.
         """
-        command, *args = shlex_split(command_str)
+
+        try:
+            command, *args = shlex_split(command_str)
+        except ValueError:
+            self.messages.append(("error", "Invalid command"))
+            return
+        except Exception as e:
+            self.messages.append(("error", f"Error: {e}"))
+            return
+
         match command.lower():
             case "exit" | "q" | "quit":
                 self.exit(0)
