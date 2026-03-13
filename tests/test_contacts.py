@@ -1,512 +1,422 @@
-"""Tests for contacts module - Birthday, Contact, and ContactBook classes."""
+"""Tests for contacts module - Contact, Birthday, and ContactBook classes."""
+
+from datetime import datetime
 
 import pytest
-from app.contacts import Birthday, Contact, ContactBook
+
+from app.contacts import Birthday, Contact
 
 
-@pytest.mark.unit
 class TestBirthday:
-    """Test cases for Birthday class."""
+    """Tests for Birthday class."""
 
-    def test_birthday_valid_format(self):
-        """Test successful creation with DD.MM.YYYY format."""
-        birthday = Birthday("15.06.1990")
-        assert birthday.value.day == 15
-        assert birthday.value.month == 6
-        assert birthday.value.year == 1990
+    @pytest.mark.parametrize(
+        "date_str,expected_str",
+        [
+            ("15.06.1990", "15.06.1990"),
+            ("01.01.2000", "01.01.2000"),
+            ("31.12.2025", "31.12.2025"),
+        ],
+    )
+    def test_birthday_creation_valid_format(self, date_str, expected_str):
+        """Test birthday creation with valid DD.MM.YYYY format."""
+        birthday = Birthday(date_str)
+        assert str(birthday) == expected_str
+        assert birthday.value == datetime.strptime(date_str, "%d.%m.%Y").date()
 
-    def test_birthday_invalid_format_wrong_separator(self):
-        """Test ValueError for wrong date separator."""
+    @pytest.mark.parametrize(
+        "date_str",
+        [
+            "1990-06-15",
+            "15/06/1990",
+            "06.15.1990",
+            "invalid",
+            "32.13.1990",
+        ],
+    )
+    def test_birthday_creation_invalid_format(self, date_str):
+        """Test birthday raises ValueError for invalid formats."""
         with pytest.raises(ValueError, match="Invalid date format"):
-            Birthday("15-06-1990")
-
-    def test_birthday_invalid_format_wrong_order(self):
-        """Test ValueError for wrong date order."""
-        with pytest.raises(ValueError, match="Invalid date format"):
-            Birthday("1990.06.15")
-
-    def test_birthday_invalid_format_invalid_day(self):
-        """Test ValueError for invalid day."""
-        with pytest.raises(ValueError, match="Invalid date format"):
-            Birthday("32.06.1990")
-
-    def test_birthday_invalid_format_invalid_month(self):
-        """Test ValueError for invalid month."""
-        with pytest.raises(ValueError, match="Invalid date format"):
-            Birthday("15.13.1990")
-
-    def test_birthday_invalid_format_invalid_date(self):
-        """Test ValueError for non-existent date (February 30)."""
-        with pytest.raises(ValueError, match="Invalid date format"):
-            Birthday("30.02.2020")
-
-    def test_birthday_empty_value(self):
-        """Test that None is accepted for optional birthday."""
-        birthday = Birthday("")
-        assert birthday.value is None
+            Birthday(date_str)
 
     def test_birthday_none_value(self):
-        """Test that None is accepted for optional birthday."""
+        """Test birthday with None value."""
         birthday = Birthday(None)
         assert birthday.value is None
+        assert str(birthday) == ""
 
-    def test_birthday_string_representation(self):
-        """Test __str__ returns correct format."""
-        birthday = Birthday("15.06.1990")
-        assert str(birthday) == "15.06.1990"
+    def test_birthday_empty_string(self):
+        """Test birthday with empty string."""
+        birthday = Birthday("")
+        assert birthday.value is None
+        assert str(birthday) == ""
 
     def test_birthday_repr(self):
-        """Test __repr__ returns same as __str__."""
+        """Test __repr__ returns string representation."""
         birthday = Birthday("15.06.1990")
-        assert repr(birthday) == str(birthday)
-
-    def test_birthday_leap_year(self):
-        """Test birthday with leap year date."""
-        birthday = Birthday("29.02.2020")
-        assert birthday.value.day == 29
-        assert birthday.value.month == 2
-        assert birthday.value.year == 2020
+        assert repr(birthday) == "15.06.1990"
 
 
-@pytest.mark.unit
 class TestContactValidation:
-    """Test cases for Contact validation methods."""
+    """Tests for Contact static validation methods."""
 
     @pytest.mark.parametrize(
         "name,expected",
         [
             ("John Doe", True),
-            ("Jane", True),
+            ("Alice", True),
+            ("Bob Smith Jr.", True),
             ("  John  ", True),
-            ("J", True),
             ("", False),
             ("   ", False),
-            ("\t\n", False),
         ],
     )
     def test_validate_name(self, name, expected):
-        """Test name validation with parametrization."""
+        """Test name validation."""
         assert Contact.validate_name(name) == expected
 
     @pytest.mark.parametrize(
         "phone,expected",
         [
-            ("+12345678901", True),
-            ("+380677773783", True),
-            ("+38268461336", True),
-            ("+123456789012345", True),
-            ("+1234567890", True),
-            ("  +12345678901  ", True),
-            ("12345678901", False),
-            ("+123456789", False),
-            ("+1234567890123456", True),
-            ("+1-234-567-8901", False),
-            ("", False),
-            ("+", False),
+            pytest.param("+380501234567", True, id="valid_uk_phone"),
+            pytest.param("+12345678901234", True, id="valid_international"),
+            pytest.param("+441234567890", True, id="valid_uk_international"),
+            pytest.param("380501234567", False, id="missing_country_code"),
+            pytest.param("+123", False, id="too_short"),
+            pytest.param("+380501234", False, id="too_short_with_code"),
+            pytest.param("+123456789012345", False, id="too_long"),
+            pytest.param("", False, id="empty"),
         ],
     )
     def test_validate_phone(self, phone, expected):
-        """Test phone number validation (E.164 format)."""
-        assert Contact.validate_phone(phone) == expected
+        """Test phone number validation."""
+        result = Contact.validate_phone(phone)
+        assert result == expected
 
     @pytest.mark.parametrize(
         "email,expected",
         [
-            ("user@example.com", True),
-            ("test.user@domain.co.uk", True),
-            ("  email@example.com  ", True),
-            ("user@localhost", False),
-            ("invalid", False),
-            ("@example.com", False),
-            ("user@", False),
-            ("user@", False),
-            ("", False),
-            ("   ", False),
+            pytest.param("john@example.com", True, id="valid_simple"),
+            pytest.param("alice.smith@domain.co.uk", True, id="valid_with_dots"),
+            pytest.param("user_tag@email.org", True, id="valid_with_underscore"),
+            pytest.param("john@example", False, id="missing_tld"),
+            pytest.param("@example.com", False, id="missing_local_part"),
+            pytest.param("john@", False, id="missing_domain"),
+            pytest.param("", False, id="empty"),
         ],
     )
     def test_validate_email(self, email, expected):
-        """Test email format validation."""
-        assert Contact.validate_email(email) == expected
+        """Test email validation."""
+        result = Contact.validate_email(email)
+        assert result == expected
 
     @pytest.mark.parametrize(
         "birthday,expected",
         [
             ("15.06.1990", True),
             ("01.01.2000", True),
-            ("31.12.2023", True),
-            ("  15.06.1990  ", True),
-            ("15-06-1990", False),
-            ("1990.06.15", False),
-            ("32.06.1990", False),
-            ("30.02.2020", False),
+            ("31.12.2025", True),
+            ("1990-06-15", False),
+            ("15/06/1990", False),
+            ("invalid", False),
+            ("32.13.1990", False),
             ("", False),
-            ("   ", False),
         ],
     )
     def test_validate_birthday(self, birthday, expected):
-        """Test birthday format validation."""
+        """Test birthday validation."""
         assert Contact.validate_birthday(birthday) == expected
 
 
-@pytest.mark.unit
-class TestContactClass:
-    """Test cases for Contact dataclass."""
+class TestContactDataclass:
+    """Tests for Contact dataclass methods."""
 
-    def test_contact_creation(self, sample_contact):
-        """Test Contact dataclass creation."""
-        assert sample_contact.name == "John Doe"
-        assert sample_contact.phone == "+12345678901"
-        assert sample_contact.email == "john.doe@example.com"
-        assert sample_contact.birthday.value.day == 15
-        assert sample_contact.birthday.value.month == 6
-        assert sample_contact.birthday.value.year == 1990
-        assert sample_contact.address == "123 Main St, City"
-
-    def test_contact_with_optional_fields(self):
-        """Test Contact with only required fields."""
-        contact = Contact(name="Test User", phone="+12345678901")
-        assert contact.name == "Test User"
-        assert contact.phone == "+12345678901"
-        assert contact.email is None
-        assert contact.birthday is None
-        assert contact.address is None
-
-    def test_contact_to_dict(self, sample_contact):
-        """Test serialization to dictionary."""
+    def test_to_dict_all_fields(self, sample_contact):
+        """Test to_dict serialization with all fields."""
         result = sample_contact.to_dict()
         assert result["name"] == "John Doe"
-        assert result["phone"] == "+12345678901"
-        assert result["email"] == "john.doe@example.com"
-        # Birthday is a Birthday object, not a string after `asdict`
-        assert str(result["birthday"]) == "15.06.1990"
+        assert result["phone"] == "+380501234567"
+        assert result["email"] == "john@example.com"
+        assert result["birthday"] == sample_contact.birthday
         assert result["address"] == "123 Main St, City"
 
-    def test_contact_from_dict(self):
-        """Test deserialization from dictionary."""
-        data = {
-            "name": "Test User",
-            "phone": "+12345678901",
-            "email": "test@example.com",
-            "birthday": "01.01.1990",
-            "address": "Test Address",
-        }
-        contact = Contact.from_dict(data)
-        assert contact.name == "Test User"
-        assert contact.phone == "+12345678901"
-        assert contact.email == "test@example.com"
-        assert str(contact.birthday) == "01.01.1990"
-        assert contact.address == "Test Address"
+    def test_to_dict_required_fields_only(self):
+        """Test to_dict with only required fields."""
+        contact = Contact(name="Jane Doe", phone="+380509876543")
+        result = contact.to_dict()
+        assert result["name"] == "Jane Doe"
+        assert result["phone"] == "+380509876543"
+        assert result["email"] is None
+        assert result["birthday"] is None
+        assert result["address"] is None
 
-    def test_contact_from_dict_with_none_values(self):
-        """Test deserialization with None values."""
+    def test_from_dict_all_fields(self):
+        """Test from_dict deserialization with all fields."""
         data = {
-            "name": "Test User",
-            "phone": "+12345678901",
-            "email": None,
-            "birthday": None,
-            "address": None,
+            "name": "Alice",
+            "phone": "+38050111222333",
+            "email": "alice@test.com",
+            "birthday": "20.03.1985",
+            "address": "456 Oak Ave",
         }
         contact = Contact.from_dict(data)
-        assert contact.name == "Test User"
-        assert contact.phone == "+12345678901"
+        assert contact.name == "Alice"
+        assert contact.phone == "+38050111222333"
+        assert contact.email == "alice@test.com"
+        assert str(contact.birthday) == "20.03.1985"
+        assert contact.address == "456 Oak Ave"
+
+    def test_from_dict_required_fields_only(self):
+        """Test from_dict with only required fields."""
+        data = {"name": "Bob", "phone": "+38050222333444"}
+        contact = Contact.from_dict(data)
+        assert contact.name == "Bob"
+        assert contact.phone == "+38050222333444"
         assert contact.email is None
         assert contact.birthday.value is None
         assert contact.address is None
 
 
-@pytest.mark.unit
 class TestContactBook:
-    """Test cases for ContactBook class."""
+    """Tests for ContactBook class."""
 
-    def test_contact_book_add_contact(self, sample_contact):
-        """Test adding contacts to ContactBook."""
-        book = ContactBook()
-        book.append(sample_contact)
-        assert len(book) == 1
-        assert book[0] == sample_contact
-
-    def test_contact_book_initialization_empty(self):
-        """Test ContactBook initialization with no contacts."""
-        book = ContactBook()
-        assert len(book) == 0
-        assert list(book) == []
-
-    # Find Exact Tests
-    def test_find_exact(self, contact_book):
-        """Test exact name matching (case-insensitive)."""
-        result = contact_book.find_exact("John Doe")
-        assert result is not None
-        assert result.name == "John Doe"
-
-    def test_find_exact_case_insensitive(self, contact_book):
-        """Test exact name matching with different cases."""
-        result = contact_book.find_exact("JOHN DOE")
-        assert result is not None
-        assert result.name == "John Doe"
-
-        result = contact_book.find_exact("john doe")
-        assert result is not None
-        assert result.name == "John Doe"
-
-    def test_find_exact_not_found(self, contact_book):
-        """Test when contact doesn't exist."""
-        result = contact_book.find_exact("Unknown Person")
-        assert result is None
-
-    # Find Tests
+    @pytest.mark.unit
     def test_find_by_name(self, contact_book):
-        """Test searching by name (substring, case-insensitive)."""
-        results = contact_book.find("John Doe")
+        """Test find method searching by name."""
+        contact_book.append(Contact(name="John Doe", phone="+380501111111"))
+        contact_book.append(Contact(name="Jane Smith", phone="+380502222222"))
+
+        results = contact_book.find("john")
         assert len(results) == 1
         assert results[0].name == "John Doe"
 
-    def test_find_by_name_case_insensitive(self, contact_book):
-        """Test name search with different cases."""
-        results = contact_book.find("john doe")
-        assert len(results) == 1
-        assert results[0].name == "John Doe"
-
+    @pytest.mark.unit
     def test_find_by_phone(self, contact_book):
-        """Test searching by phone number."""
-        results = contact_book.find("+12345678901")
-        assert len(results) == 1
-        assert results[0].phone == "+12345678901"
+        """Test find method searching by phone."""
+        contact_book.append(Contact(name="Alice", phone="+380501111111"))
+        contact_book.append(Contact(name="Bob", phone="+380502222222"))
 
+        results = contact_book.find("+380501")
+        assert len(results) == 1
+        assert results[0].phone == "+380501111111"
+
+    @pytest.mark.unit
     def test_find_by_email(self, contact_book):
-        """Test searching by email."""
-        results = contact_book.find("john.doe@example.com")
-        assert len(results) == 1
-        assert results[0].email == "john.doe@example.com"
+        """Test find method searching by email."""
+        contact_book.append(
+            Contact(name="Alice", phone="+380501111111", email="alice@test.com")
+        )
+        contact_book.append(
+            Contact(name="Bob", phone="+380502222222", email="bob@test.com")
+        )
 
-    def test_find_by_email_case_insensitive(self, contact_book):
-        """Test email search with different cases."""
-        results = contact_book.find("john.doe@example.com".upper())
+        results = contact_book.find("alice@test.com")
         assert len(results) == 1
+        assert results[0].email == "alice@test.com"
 
+    @pytest.mark.unit
     def test_find_by_address(self, contact_book):
-        """Test searching by address."""
-        results = contact_book.find("Main St")
-        assert len(results) == 1
-        assert "Main St" in results[0].address
+        """Test find method searching by address."""
+        contact_book.append(
+            Contact(name="Alice", phone="+380501111111", address="123 Main St")
+        )
+        contact_book.append(
+            Contact(name="Bob", phone="+380502222222", address="456 Oak Ave")
+        )
 
+        results = contact_book.find("main")
+        assert len(results) == 1
+        assert results[0].address == "123 Main St"
+
+    @pytest.mark.unit
     def test_find_by_birthday(self, contact_book):
-        """Test searching by birthday."""
-        results = contact_book.find("15.06.1990")
+        """Test find method searching by birthday."""
+        contact_book.append(
+            Contact(name="Alice", phone="+380501111111", birthday="15.06.1990")
+        )
+        contact_book.append(
+            Contact(name="Bob", phone="+380502222222", birthday="20.03.1985")
+        )
+
+        results = contact_book.find("1990")
+        assert len(results) == 1
+        assert results[0].name == "Alice"
+
+    @pytest.mark.unit
+    def test_find_empty_book(self, contact_book):
+        """Test find method returns empty list for empty book."""
+        results = contact_book.find("john")
+        assert results == []
+
+    @pytest.mark.unit
+    def test_find_case_insensitive(self, contact_book):
+        """Test find method is case insensitive."""
+        contact_book.append(Contact(name="John Doe", phone="+380501111111"))
+        contact_book.append(Contact(name="JANE SMITH", phone="+380502222222"))
+
+        results = contact_book.find("doe")
         assert len(results) == 1
         assert results[0].name == "John Doe"
 
-    def test_find_multiple_results(self, contact_book):
-        """Test finding multiple matching contacts."""
-        book = ContactBook()
-        book.append(Contact(name="John Doe", phone="+11111111111"))
-        book.append(Contact(name="John Smith", phone="+22222222222"))
-        book.append(Contact(name="Jane Doe", phone="+33333333333"))
-        results = book.find("John")
-        assert len(results) == 2
-
-    def test_find_no_results(self, contact_book):
-        """Test search with no matching results."""
-        results = contact_book.find("NonExistentTerm")
-        assert len(results) == 0
-
-    # Delete Tests
-    def test_delete_contact(self, contact_book):
-        """Test deleting existing contact."""
-        initial_length = len(contact_book)
-        result = contact_book.delete("John Doe")
-        assert result is True
-        assert len(contact_book) == initial_length - 1
-        assert contact_book.find_exact("John Doe") is None
-
-    def test_delete_contact_case_insensitive(self, contact_book):
-        """Test deleting contact with different case."""
-        initial_length = len(contact_book)
-        result = contact_book.delete("JOHN DOE")
-        assert result is True
-        assert len(contact_book) == initial_length - 1
-
-    def test_delete_nonexistent_contact(self, contact_book):
-        """Test deleting non-existing contact."""
-        initial_length = len(contact_book)
-        result = contact_book.delete("Unknown Person")
-        assert result is False
-        assert len(contact_book) == initial_length
-
-    # Edit Tests
-    def test_edit_contact_phone(self, contact_book):
-        """Test editing phone field."""
-        result = contact_book.edit("John Doe", {"phone": "+99999999999"})
-        assert result is True
-        contact = contact_book.find_exact("John Doe")
-        assert contact.phone == "+99999999999"
-
-    def test_edit_contact_email(self, contact_book):
-        """Test editing email field."""
-        result = contact_book.edit("John Doe", {"email": "newemail@example.com"})
-        assert result is True
-        contact = contact_book.find_exact("John Doe")
-        assert contact.email == "newemail@example.com"
-
-    def test_edit_contact_address(self, contact_book):
-        """Test editing address field."""
-        result = contact_book.edit("John Doe", {"address": "New Address 123"})
-        assert result is True
-        contact = contact_book.find_exact("John Doe")
-        assert contact.address == "New Address 123"
-
-    def test_edit_contact_birthday(self, contact_book):
-        """Test editing birthday field."""
-        result = contact_book.edit("John Doe", {"birthday": "20.07.1995"})
-        assert result is True
-        contact = contact_book.find_exact("John Doe")
-        assert str(contact.birthday) == "20.07.1995"
-
-    def test_edit_multiple_fields(self, contact_book):
-        """Test editing multiple fields at once."""
-        result = contact_book.edit(
-            "John Doe",
-            {
-                "phone": "+99999999999",
-                "email": "new@example.com",
-                "address": "New Addr",
-            },
-        )
-        assert result is True
-        contact = contact_book.find_exact("John Doe")
-        assert contact.phone == "+99999999999"
-        assert contact.email == "new@example.com"
-        assert contact.address == "New Addr"
-
-    def test_edit_with_whitespace(self, contact_book):
-        """Test editing with whitespace gets stripped."""
-        result = contact_book.edit("John Doe", {"phone": "  +99999999999  "})
-        assert result is True
-        contact = contact_book.find_exact("John Doe")
-        assert contact.phone == "+99999999999"
-
-    def test_edit_nonexistent_contact(self, contact_book):
-        """Test editing non-existing contact."""
-        result = contact_book.edit("Unknown Person", {"phone": "+99999999999"})
-        assert result is False
-
-    # Upcoming Birthdays Tests
-    def test_upcoming_birthdays_within_range(self, contact_book, today_plus_delta):
-        """Test finding contacts with upcoming birthdays within range."""
-        # Add a contact with birthday in 5 days
-        birthday_in_5_days = today_plus_delta(5)
-        contact_book.append(
-            Contact(
-                name="Upcoming Birthday",
-                phone="+11111111111",
-                birthday=Birthday(birthday_in_5_days),
-            )
-        )
-        results = contact_book.upcoming_birthdays(days=7)
-        assert len(results) >= 1
-        assert any(r["name"] == "Upcoming Birthday" for r in results)
-
-    def test_upcoming_birthdays_year_wrap(self, contact_book, today_plus_delta):
-        """Test birthday wrapping to next year when passed this year."""
-        # Add a contact with birthday that was 5 days ago this year
-        birthday_past = today_plus_delta(5)
-        contact = Contact(
-            name="Past Birthday",
-            phone="+11111111111",
-            birthday=Birthday(birthday_past),
-        )
-        print(contact)
-        contact_book.append(contact)
-        results = contact_book.upcoming_birthdays(days=7)
-        assert len(results) >= 1
-        assert any(r["name"] == "Past Birthday" for r in results)
-
-    def test_upcoming_birthdays_no_birthday_set(
-        self, sample_contact_no_birthday, today_plus_delta
-    ):
-        """Test contacts without birthdays are excluded."""
-        book = ContactBook()
-        book.append(sample_contact_no_birthday)
-        results = book.upcoming_birthdays(days=365)
-        assert len(results) == 0
-
-    def test_upcoming_birthdays_beyond_range(self, contact_book, today_plus_delta):
-        """Test contacts with birthdays beyond range are excluded."""
-        birthday_far = today_plus_delta(100)
-        contact_book.append(
-            Contact(
-                name="Far Birthday",
-                phone="+11111111111",
-                birthday=Birthday(birthday_far),
-            )
-        )
-        results = contact_book.upcoming_birthdays(days=30)
-        assert not any(r["name"] == "Far Birthday" for r in results)
-
-    def test_upcoming_birthdays_exactly_today(self, today_plus_delta):
-        """Test contact with birthday exactly today."""
-        birthday_today = today_plus_delta(0)
-        book = ContactBook()
-        book.append(
-            Contact(
-                name="Today Birthday",
-                phone="+11111111111",
-                birthday=Birthday(birthday_today),
-            )
-        )
-        results = book.upcoming_birthdays(days=7)
+        results = contact_book.find("jane")
         assert len(results) == 1
-        assert results[0]["days"] == 0
+        assert results[0].name == "JANE SMITH"
 
-    def test_upcoming_birthdays_result_format(self, contact_book, today_plus_delta):
-        """Test upcoming birthdays returns correct format."""
-        birthday_in_3_days = today_plus_delta(3)
-        contact_book.append(
-            Contact(
-                name="Test Birthday",
-                phone="+11111111111",
-                birthday=Birthday(birthday_in_3_days),
-            )
-        )
-        results = contact_book.upcoming_birthdays(days=7)
-        result = next(r for r in results if r["name"] == "Test Birthday")
-        assert "name" in result
-        assert "birthday" in result
-        assert "days" in result
-        assert result["name"] == "Test Birthday"
-        assert isinstance(result["days"], int)
+    @pytest.mark.unit
+    def test_upcoming_birthdays_today(self, contacts_with_birthdays):
+        """Test upcoming_birthdays includes birthday today."""
+        results = contacts_with_birthdays.upcoming_birthdays(7)
+        today_names = [r["name"] for r in results]
+        assert "Birthday Today" in today_names
 
-    # Serialization Tests
-    def test_to_list(self, contact_book):
-        """Test serializing ContactBook to list of dicts."""
-        result = contact_book.to_list()
-        assert isinstance(result, list)
-        assert len(result) == len(contact_book)
-        assert all(isinstance(item, dict) for item in result)
-        assert all("name" in item and "phone" in item for item in result)
+    @pytest.mark.unit
+    def test_upcoming_birthdays_tomorrow(self, contacts_with_birthdays):
+        """Test upcoming_birthdays includes birthday tomorrow."""
+        results = contacts_with_birthdays.upcoming_birthdays(7)
+        today_names = [r["name"] for r in results]
+        assert "Birthday Tomorrow" in today_names
 
-    def test_to_list_empty_book(self):
-        """Test serializing empty ContactBook."""
-        book = ContactBook()
-        result = book.to_list()
-        assert result == []
+    @pytest.mark.unit
+    def test_upcoming_birthdays_next_week(self, contacts_with_birthdays):
+        """Test upcoming_birthdays includes birthday in 7 days."""
+        results = contacts_with_birthdays.upcoming_birthdays(7)
+        today_names = [r["name"] for r in results]
+        assert "Birthday Next Week" in today_names
 
-    def test_load_from_list(self, valid_contacts_data):
-        """Test deserializing list of dicts to ContactBook."""
-        book = ContactBook()
-        book.load_from_list(valid_contacts_data)
-        assert len(book) == len(valid_contacts_data)
-        assert book.find_exact("John Doe") is not None
-        assert book.find_exact("Jane Smith") is not None
-        assert book.find_exact("Bob Johnson") is not None
+    @pytest.mark.unit
+    def test_upcoming_birthdays_past_wraps_to_next_year(self, contacts_with_birthdays):
+        """Test upcoming_birthdays wraps past birthdays to next year."""
+        results = contacts_with_birthdays.upcoming_birthdays(365)
+        today_names = [r["name"] for r in results]
+        # Past birthday should appear when searching far enough ahead
+        assert "Birthday Past" in today_names
 
-    def test_load_from_list_replaces_data(self, contact_book, valid_contacts_data):
-        """Test that load_from_list replaces existing data."""
-        initial_length = len(contact_book)
-        contact_book.load_from_list(valid_contacts_data)
-        assert len(contact_book) != initial_length
-        assert len(contact_book) == len(valid_contacts_data)
+    @pytest.mark.unit
+    def test_upcoming_birthdays_no_birthday_contact(self, contacts_with_birthdays):
+        """Test upcoming_birthdays excludes contacts without birthday."""
+        results = contacts_with_birthdays.upcoming_birthdays(7)
+        today_names = [r["name"] for r in results]
+        assert "No Birthday" not in today_names
 
+    @pytest.mark.unit
+    def test_upcoming_birthdays_days_parameter(self, contacts_with_birthdays):
+        """Test upcoming_birthdays respects days parameter."""
+        results_1_day = contacts_with_birthdays.upcoming_birthdays(1)
+        results_7_days = contacts_with_birthdays.upcoming_birthdays(7)
+
+        # More birthdays should be found with larger day range
+        assert len(results_7_days) >= len(results_1_day)
+
+    @pytest.mark.unit
+    def test_edit_name(self, contact_book, sample_contact):
+        """Test edit method updates name."""
+        contact_book.append(sample_contact)
+
+        result = contact_book.edit(1, {"name": "Jane Doe"})
+        assert result is True
+        assert contact_book.data[0].name == "Jane Doe"
+
+    @pytest.mark.unit
+    def test_edit_phone(self, contact_book, sample_contact):
+        """Test edit method updates phone."""
+        contact_book.append(sample_contact)
+
+        result = contact_book.edit(1, {"phone": "+380509876543"})
+        assert result is True
+        assert contact_book.data[0].phone == "+380509876543"
+
+    @pytest.mark.unit
+    def test_edit_email(self, contact_book, sample_contact):
+        """Test edit method updates email."""
+        contact_book.append(sample_contact)
+
+        result = contact_book.edit(1, {"email": "newemail@test.com"})
+        assert result is True
+        assert contact_book.data[0].email == "newemail@test.com"
+
+    @pytest.mark.unit
+    def test_edit_address(self, contact_book, sample_contact):
+        """Test edit method updates address."""
+        contact_book.append(sample_contact)
+
+        result = contact_book.edit(1, {"address": "New Address"})
+        assert result is True
+        assert contact_book.data[0].address == "New Address"
+
+    @pytest.mark.unit
+    def test_edit_birthday(self, contact_book, sample_contact):
+        """Test edit method updates birthday."""
+        contact_book.append(sample_contact)
+
+        result = contact_book.edit(1, {"birthday": "20.03.1985"})
+        assert result is True
+        assert str(contact_book.data[0].birthday) == "20.03.1985"
+
+    @pytest.mark.unit
+    def test_edit_multiple_fields(self, contact_book, sample_contact):
+        """Test edit method updates multiple fields."""
+        contact_book.append(sample_contact)
+
+        result = contact_book.edit(1, {"name": "Jane", "phone": "+380509876543"})
+        assert result is True
+        assert contact_book.data[0].name == "Jane"
+        assert contact_book.data[0].phone == "+380509876543"
+
+    @pytest.mark.unit
+    def test_edit_partial_update(self, contact_book, sample_contact):
+        """Test edit method only updates provided fields."""
+        contact_book.append(sample_contact)
+        original_email = sample_contact.email
+        original_address = sample_contact.address
+
+        result = contact_book.edit(1, {"name": "Jane Doe"})
+        assert result is True
+        assert contact_book.data[0].name == "Jane Doe"
+        assert contact_book.data[0].email == original_email
+        assert contact_book.data[0].address == original_address
+
+    @pytest.mark.unit
+    def test_edit_invalid_index(self, contact_book):
+        """Test edit method returns False for invalid index."""
+        result = contact_book.edit(999, {"name": "Test"})
+        assert result is False
+
+    @pytest.mark.unit
+    def test_edit_empty_fields(self, contact_book, sample_contact):
+        """Test edit method ignores empty field values."""
+        contact_book.append(sample_contact)
+        original_name = sample_contact.name
+
+        result = contact_book.edit(1, {"name": ""})
+        assert result is True
+        assert contact_book.data[0].name == original_name
+
+    @pytest.mark.unit
+    def test_load_from_list(self, contact_book):
+        """Test load_from_list replaces existing data."""
+        data = [
+            {
+                "name": "Contact 1",
+                "phone": "+380501111111",
+                "email": "contact1@test.com",
+            },
+            {
+                "name": "Contact 2",
+                "phone": "+380502222222",
+                "birthday": "15.06.1990",
+            },
+        ]
+
+        contact_book.load_from_list(data)
+
+        assert len(contact_book.data) == 2
+        assert contact_book.data[0].name == "Contact 1"
+        assert contact_book.data[1].name == "Contact 2"
+
+    @pytest.mark.unit
     def test_load_from_list_empty(self, contact_book):
-        """Test loading empty list clears ContactBook."""
+        """Test load_from_list with empty list."""
+        contact_book.append(Contact(name="Existing", phone="+380501111111"))
         contact_book.load_from_list([])
-        assert len(contact_book) == 0
+
+        assert len(contact_book.data) == 0

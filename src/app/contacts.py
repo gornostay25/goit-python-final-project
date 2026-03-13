@@ -1,10 +1,11 @@
-from collections import UserList
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 
+from app.book import Book
+
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
-PHONE_REGEX = r"^\+\d{1,3}\d{9,14}$"
+PHONE_REGEX = r"^\+\d{1,3}\d{9,11}$"
 DATE_FORMAT = "%d.%m.%Y"
 
 
@@ -18,8 +19,17 @@ class Birthday:
     def __init__(self, value):
         self.value = value
 
+    def __eq__(self, value: object, /) -> bool:
+        if isinstance(value, Birthday):
+            return self.value == value.value
+        if isinstance(value, datetime.date):
+            return self.value == value
+        if isinstance(value, str):
+            return self.value == datetime.strptime(value, DATE_FORMAT).date()
+        return False
+
     def __str__(self):
-        return datetime.strftime(self.value, DATE_FORMAT)
+        return self.value.strftime(DATE_FORMAT) if self.value else ""
 
     def __repr__(self):
         return self.__str__()
@@ -31,7 +41,7 @@ class Birthday:
     @value.setter
     def value(self, new_value):
         try:
-            if not new_value:
+            if not new_value or not new_value.strip():
                 self._value = None
                 return
             self._value = datetime.strptime(new_value, DATE_FORMAT).date()
@@ -144,29 +154,12 @@ class Contact:
     # endregion
 
 
-class ContactBook(UserList[Contact]):
+class ContactBook(Book[Contact]):
     """Manages contact collection with search, edit, and birthday tracking.
 
     Extends UserList to provide list-like access while adding domain-specific
     operations for contact management.
     """
-
-    def find_exact(self, name: str) -> Contact | None:
-        """Find contact by exact name match (case-insensitive).
-
-        Uses case-insensitive comparison for user convenience,
-        allowing variations like "John" or "john" to match.
-
-        Args:
-            name: Contact name to search for.
-
-        Returns:
-            Contact instance if found, None otherwise.
-        """
-        for contact in self.data:
-            if contact.name.casefold() == name.casefold():
-                return contact
-        return None
 
     def find(self, search: str) -> list[Contact]:
         """Search all contact fields for matching terms.
@@ -195,21 +188,6 @@ class ContactBook(UserList[Contact]):
             elif contact.birthday and keywords in str(contact.birthday):
                 found.append(contact)
         return found
-
-    def delete(self, name: str) -> bool:
-        """Delete a contact by name.
-
-        Args:
-            name: Contact name to delete.
-
-        Returns:
-            True if contact was found and deleted, False otherwise.
-        """
-        contact = self.find_exact(name)
-        if not contact:
-            return False
-        self.data.remove(contact)
-        return True
 
     def upcoming_birthdays(self, days: int) -> list[dict]:
         """Find contacts with birthdays occurring within the next N days.
@@ -249,23 +227,27 @@ class ContactBook(UserList[Contact]):
 
         return result
 
-    def edit(self, name: str, fields: dict) -> bool:
+    def edit(self, index: int | str, fields: dict) -> bool:
         """Update contact fields with validated values.
 
         Only updates fields that are present and non-empty in the dictionary.
-        All validation should be performed by the caller before calling this method.
+        This partial update pattern allows editing specific contact attributes
+        without requiring full contact data.
 
         Args:
-            name: Contact name to edit.
-            fields: Dictionary containing fields to update with keys:
-                    'phone', 'email', 'address', 'birthday'.
+            index: 1-based index of contact to edit.
+            fields: Dictionary containing fields to update. Valid keys:
+                    'name', 'phone', 'email', 'address', 'birthday'.
 
         Returns:
             True if contact was found and updated, False otherwise.
         """
-        contact = self.find_exact(name)
+        contact = self.get(index)
         if not contact:
             return False
+
+        if "name" in fields and fields["name"]:
+            contact.name = fields["name"].strip()
 
         if "phone" in fields and fields["phone"]:
             contact.phone = fields["phone"].strip()
@@ -280,16 +262,6 @@ class ContactBook(UserList[Contact]):
             contact.birthday = Birthday(fields["birthday"])
 
         return True
-
-    def to_list(self) -> list[dict]:
-        """Convert all contacts to list of dictionaries for serialization.
-
-        Enables easy JSON export and persistence of contact data.
-
-        Returns:
-            List of contact dictionaries with all field values.
-        """
-        return [contact.to_dict() for contact in self.data]
 
     def load_from_list(self, data: list[dict]) -> None:
         """Load contacts from list of dictionaries for deserialization.
