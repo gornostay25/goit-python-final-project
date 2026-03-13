@@ -1,7 +1,8 @@
-from collections import UserList
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
+
+from app.book import Book
 
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 PHONE_REGEX = r"^\+\d{1,3}\d{9,14}$"
@@ -144,30 +145,12 @@ class Contact:
     # endregion
 
 
-class ContactBook(UserList[Contact]):
+class ContactBook(Book[Contact]):
     """Manages contact collection with search, edit, and birthday tracking.
 
     Extends UserList to provide list-like access while adding domain-specific
     operations for contact management.
     """
-
-    def get(self, index: int | str) -> Contact | None:
-        """Get contact by index.
-
-        Args:
-            index: Contact index to get.
-
-        Returns:
-            Contact instance if found, None otherwise.
-        """
-        if isinstance(index, str) and index.isdigit():
-            index = int(index)
-        elif not isinstance(index, int):
-            return None
-
-        if index < 1 or index > len(self.data):
-            return None
-        return self.data[index - 1]
 
     def find(self, search: str) -> list[Contact]:
         """Search all contact fields for matching terms.
@@ -196,21 +179,6 @@ class ContactBook(UserList[Contact]):
             elif contact.birthday and keywords in str(contact.birthday):
                 found.append(contact)
         return found
-
-    def delete(self, index: int | str) -> bool:
-        """Delete a contact by name.
-
-        Args:
-            name: Contact name to delete.
-
-        Returns:
-            True if contact was found and deleted, False otherwise.
-        """
-        contact = self.get(index)
-        if not contact:
-            return False
-        self.data.remove(contact)
-        return True
 
     def upcoming_birthdays(self, days: int) -> list[dict]:
         """Find contacts with birthdays occurring within the next N days.
@@ -285,16 +253,6 @@ class ContactBook(UserList[Contact]):
 
         return True
 
-    def to_list(self) -> list[dict]:
-        """Convert all contacts to list of dictionaries for serialization.
-
-        Enables easy JSON export and persistence of contact data.
-
-        Returns:
-            List of contact dictionaries with all field values.
-        """
-        return [contact.to_dict() for contact in self.data]
-
     def load_from_list(self, data: list[dict]) -> None:
         """Load contacts from list of dictionaries for deserialization.
 
@@ -305,14 +263,3 @@ class ContactBook(UserList[Contact]):
             data: List of contact dictionaries to load.
         """
         self.data = [Contact.from_dict(item) for item in data]
-
-    def validate_index(self, index: str) -> bool:
-        """Validate index format.
-
-        Args:
-            index: Index to validate.
-
-        Returns:
-            True if index is a number greater than 0, False otherwise.
-        """
-        return index.isdigit() and int(index) > 0 and int(index) <= len(self.data)

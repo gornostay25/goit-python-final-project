@@ -1,7 +1,6 @@
 import json
 import os
 
-
 # Назви файлів для збереження даних
 CONTACTS_FILE = "contacts.json"
 NOTES_FILE = "notes.json"

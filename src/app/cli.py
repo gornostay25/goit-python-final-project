@@ -1,155 +1,36 @@
 """Command-line interface for the Personal Assistant."""
 
-from app import __version__, __authors__, __description__
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.live import Live
-from rich.align import Align
-from rich.layout import Layout
-from time import sleep
-from difflib import get_close_matches
 from shlex import split as shlex_split
-from app.contacts import Contact, ContactBook
-from functools import wraps
-from prompt_toolkit.shortcuts import PromptSession
-from prompt_toolkit.completion import WordCompleter, Completer, Completion
-from prompt_toolkit.history import InMemoryHistory
+from time import sleep
+
 from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.lexers import PygmentsLexer
+from prompt_toolkit.shortcuts import PromptSession, prompt
+from prompt_toolkit.validation import Validator
+from pygments.lexer import Lexer
+from pygments.lexers.markup import MarkdownLexer
+from rich.align import Align
+from rich.console import Console, RenderableType
+from rich.layout import Layout
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
+from app import __authors__, __description__, __version__
+from app.contacts import Contact, ContactBook
 from app.notes import Note, NotesBook
-
-
-AVAILABLE_COMMANDS = [
-    ("add-contact", "contacts"),
-    ("show-contacts", "contacts"),
-    ("find-contact", "contacts"),
-    ("edit-contact", "contacts"),
-    ("delete-contact", "contacts"),
-    ("birthdays", "contacts"),
-    ("add-note", "notes"),
-    ("show-notes", "notes"),
-    ("find-note", "notes"),
-    ("edit-note", "notes"),
-    ("delete-note", "notes"),
-    ("find-tag", "notes"),
-    ("sort-notes-by-tags", "notes"),
-    ("help", "general"),
-    ("exit", "general"),
-]
-
-COMMAND_SIGNATURES = {
-    "add-contact": "<name> <phone> [email] [birthday] [address]",
-    "show-contacts": None,
-    "find-contact": "<search>",
-    "edit-contact": "<index> [name] [phone] [email] [birthday] [address]",
-    "delete-contact": "<index>",
-    "birthdays": "<days>",
-    "add-note": "<text> [tag,tag,tag...]",
-    "show-notes": None,
-    "find-note": "<search>",
-    "edit-note": "<index> <new_text> [tag,tag,tag...]",
-    "delete-note": "<index>",
-    "find-tag": "<tag>",
-    "sort-notes-by-tags": None,
-    "help": None,
-    "exit": None,
-}
-
-ERROR_MESSAGES = {
-    "notes": {
-        "text": "Invalid text, must be a string",
-        "tags": "Invalid tags, must be a list of strings separated by commas",
-    },
-    "contacts": {
-        "index": "Invalid index, must be a number greater than 0",
-        "not_found": lambda index: f"Contact with index '{index}' not found",
-        "name": "Invalid name, must be a string",
-        "phone": "Invalid phone, must be in format +380XXXXXXXXX",
-        "email": "Invalid email, must be in format example@example.com",
-        "birthday": "Invalid birthday, must be in format DD.MM.YYYY",
-        "address": "Invalid address, must be a string",
-        "days": "Invalid number of days, must be a number greater than 0",
-    },
-}
-
-
-class CommandCompleter(Completer):
-    """Custom completer that shows commands initially and arguments after space."""
-
-    def __init__(self, commands, signatures):
-        """Initialize with commands and their argument signatures.
-
-        Args:
-            commands: List of available command names.
-            signatures: Dict mapping command names to their argument signatures.
-        """
-        self.commands = commands
-        self.signatures = signatures
-        self.word_completer = WordCompleter(
-            commands, meta_dict=signatures, ignore_case=True
-        )
-
-    def get_completions(self, document, complete_event):
-        """Return completions based on current context.
-
-        If line is empty or before command completion: show all commands.
-        If command typed and space pressed: show that command's signature.
-        """
-        text = document.text_before_cursor
-        words = text.strip().split()
-
-        # No command typed yet - show all commands
-        if len(words) == 0:
-            for completion in self.word_completer.get_completions(
-                document, complete_event
-            ):
-                yield completion
-
-        # First word (command) typed, no space yet - show matching commands
-        elif len(words) == 1 and not text.endswith(" "):
-            for completion in self.word_completer.get_completions(
-                document, complete_event
-            ):
-                yield completion
-
-        # Command typed and space pressed - show its signature
-        else:
-            command = words[0].lower()
-            if command in self.signatures:
-                signature = self.signatures[command]
-                if signature:
-                    yield Completion(
-                        text=" ",
-                        start_position=0,
-                        display=f"Arguments: {signature}",
-                    )
-
-
-def handle_operation_errors(func):
-    """Decorate command handlers to catch and display errors gracefully.
-
-    Prevents unhandled exceptions from crashing the CLI and provides
-    consistent error messaging. Special handling for OperationCancelledError
-    (user interruption with Ctrl+C) to avoid displaying error messages.
-
-    Returns:
-        Decorated function that catches exceptions and adds error messages.
-    """
-
-    @wraps(func)
-    def inner(self, *args, **kwargs):
-        try:
-            return func(self, *args, **kwargs)
-        except OperationCancelledError:
-            # Silently handle user cancellation without showing errors
-            return
-        # except Exception as e:
-        #     self.messages.append(("error", f"Error: {str(e)}"))
-        #     return
-
-    return inner
+from app.utils import (
+    AVAILABLE_COMMANDS,
+    COMMAND_SIGNATURES,
+    ERROR_MESSAGES,
+    CommandCompleter,
+    OperationCancelledError,
+    handle_operation_errors,
+    suggest_command,
+)
 
 
 class PersonalAssistantCLI:
@@ -167,7 +48,7 @@ class PersonalAssistantCLI:
         """Initialize CLI with Rich console, prompt_toolkit session, and empty message history."""
         self.console = Console()
         self.console.set_window_title("Personal Assistant")
-        self.messages: list[tuple[str, str | Table]] = []
+        self.messages: list[tuple[str, RenderableType]] = []
 
         self.contact_book = contact_book
         self.note_book = note_book
@@ -177,10 +58,10 @@ class PersonalAssistantCLI:
         completer = CommandCompleter(
             [cmd[0] for cmd in AVAILABLE_COMMANDS], COMMAND_SIGNATURES
         )
-        self.prompt_session = PromptSession(history=history, completer=completer)
+        self.command_session = PromptSession(history=history, completer=completer)
 
     # region Render methods
-    def __render_message(self, msg_type: str, msg_text: str) -> Text:
+    def __render_message(self, msg_type: str, msg_text: RenderableType) -> Text:
         """Apply color styling to messages based on type.
 
         Args:
@@ -207,7 +88,7 @@ class PersonalAssistantCLI:
         Creates visual introduction using Rich Layout with ASCII logo,
         project description, and animated countdown before entering main loop.
         """
-        TIMEOUT_SEC = 10
+        TIMEOUT_SEC = 3
         layout = Layout()
 
         title_text = Text.assemble(
@@ -310,7 +191,7 @@ class PersonalAssistantCLI:
             if msg_type != "command":
                 self.console.line()
 
-    def __show_header(self) -> None:
+    def __show_header(self):
         """Display application header with name and version at top of console.
 
         Creates a styled panel showing the application name and version number,
@@ -329,6 +210,56 @@ class PersonalAssistantCLI:
         )
         self.console.line()
 
+    def __render_contacts_table(self, contacts: list[Contact]):
+        table = Table(
+            title="Contacts",
+            show_lines=True,
+        )
+        table.add_column("Name", style="cyan", justify="left")
+        table.add_column("Phone", style="green", justify="left")
+        table.add_column("Email", style="blue", justify="left")
+        table.add_column("Birthday", style="magenta", justify="left")
+        table.add_column("Address", style="yellow", justify="left")
+        for contact in contacts:
+            table.add_row(
+                contact.name,
+                contact.phone,
+                contact.email,
+                str(contact.birthday) if contact.birthday else "",
+                contact.address,
+            )
+        return table
+
+    def __render_birthdays_table(self, upcoming_birthdays: list[dict]):
+        table = Table(title="Upcoming Birthdays")
+        table.add_column("Name", style="cyan", justify="left")
+        table.add_column("Birthday", style="magenta", justify="left")
+        table.add_column("Days", style="yellow", justify="left")
+        for birthday in upcoming_birthdays:
+            table.add_row(birthday["name"], birthday["birthday"], str(birthday["days"]))
+        return table
+
+    def __render_notes_table(self, notes: list[Note]):
+        table = Table(
+            title="Notes",
+            show_lines=True,
+            caption="To see full note, use 'show-notes <index>' command",
+        )
+        table.add_column("№", style="dim", justify="left")
+        table.add_column("Title", style="cyan", justify="left")
+        table.add_column("Tags", style="magenta", justify="left")
+        for note in notes:
+            original_index = self.note_book.data.index(note) + 1
+            table.add_row(str(original_index), note.title, note.tags_str)
+        return table
+
+    def __render_note_details(self, note: Note):
+        return Panel(
+            Markdown(note.text),
+            subtitle=f"Tags: {note.tags_str}" if len(note.tags) > 0 else None,
+            subtitle_align="right",
+        )
+
     # endregion
 
     # region Input methods
@@ -338,7 +269,7 @@ class PersonalAssistantCLI:
         Returns:
             The user's command, or None if input is empty.
         """
-        command = self.prompt_session.prompt(
+        command = self.command_session.prompt(
             message=HTML("<b fg='yellow'>> </b>")
         ).strip()
         if not command:
@@ -347,10 +278,14 @@ class PersonalAssistantCLI:
 
     def __input_field(
         self,
-        prompt: str,
+        message: str,
         optional: bool = False,
         error_message: str = "Invalid input",
         validator: callable = None,
+        placeholder: str | None = None,
+        default: str = "",
+        multiline: bool = False,
+        lexer: Lexer | None = None,
     ) -> str:
         """Prompt for field input with optional validation and cancellation.
 
@@ -369,23 +304,33 @@ class PersonalAssistantCLI:
         Raises:
             OperationCancelledError: If user interrupts with Ctrl+C.
         """
+        ptk_validator = None
+        if validator:
+            ptk_validator = Validator.from_callable(
+                validate_func=lambda x: True if optional and not x else validator(x),
+                error_message=error_message,
+                move_cursor_to_end=True,
+            )
+
+        rprompt = "(Optional)" if optional else None
+        toolbar = HTML(
+            f"<b>[{'ESC+Enter' if multiline else 'Enter'}] to submit, [Ctrl+C] to cancel</b>"
+        )
         while True:
             try:
-                str_value = self.console.input(
-                    f"[bold yellow]{prompt}{' (optional)' if optional else ''}: [/bold yellow]"
-                ).strip()
-                # Required fields must not be empty
-                if not optional and not str_value:
-                    self.console.print(
-                        self.__render_message("error", "Value cannot be empty")
-                    )
-                    continue
-                # Validate non-empty values if validator provided
-                if str_value and validator and not validator(str_value):
-                    self.console.print(self.__render_message("error", error_message))
-                    continue
+                value = prompt(
+                    f"{message}: ",
+                    placeholder=placeholder,
+                    default=default,
+                    validator=ptk_validator,
+                    validate_while_typing=False,
+                    rprompt=rprompt,
+                    multiline=multiline,
+                    bottom_toolbar=toolbar,
+                    lexer=lexer,
+                )
+                return value
 
-                return str_value
             except KeyboardInterrupt:
                 self.messages.append(("error", "Operation cancelled"))
                 raise OperationCancelledError
@@ -396,7 +341,7 @@ class PersonalAssistantCLI:
 
     # region Contact methods
     @handle_operation_errors
-    def __process_add_contact_command(self, args: list[str]) -> str:
+    def __handle_add_contact_command(self, args: list[str]):
         """Add new contact via CLI args or interactive prompts.
 
         Supports both direct arguments (name phone [email] [birthday] [address])
@@ -517,7 +462,7 @@ class PersonalAssistantCLI:
         )
         return
 
-    def __process_show_contacts_command(self):
+    def __handle_show_contacts_command(self):
         """Display all contacts in a formatted table.
 
         Shows empty message if no contacts exist.
@@ -526,26 +471,11 @@ class PersonalAssistantCLI:
         if not contacts:
             self.messages.append(("response", "No contacts found"))
             return
-        table = Table(title="Contacts")
-        table.add_column("№", style="dim", justify="left")
-        table.add_column("Name", style="cyan", justify="left")
-        table.add_column("Phone", style="green", justify="left")
-        table.add_column("Email", style="blue", justify="left")
-        table.add_column("Birthday", style="magenta", justify="left")
-        table.add_column("Address", style="yellow", justify="left")
-        for index, contact in enumerate(contacts, start=1):
-            table.add_row(
-                str(index),
-                contact.name,
-                contact.phone,
-                contact.email,
-                str(contact.birthday) if contact.birthday else "",
-                contact.address,
-            )
-        self.messages.append(("table", table))
+
+        self.messages.append(("table", self.__render_contacts_table(contacts)))
 
     @handle_operation_errors
-    def __process_find_contact_command(self, args: list[str]):
+    def __handle_find_contact_command(self, args: list[str]):
         """Search contacts by matching term across all fields.
 
         Args:
@@ -573,24 +503,10 @@ class PersonalAssistantCLI:
             self.messages.append(("response", "No contacts found"))
             return
 
-        table = Table(title="Contacts")
-        table.add_column("Name", style="cyan", justify="left")
-        table.add_column("Phone", style="green", justify="left")
-        table.add_column("Email", style="blue", justify="left")
-        table.add_column("Birthday", style="magenta", justify="left")
-        table.add_column("Address", style="yellow", justify="left")
-        for contact in contacts:
-            table.add_row(
-                contact.name,
-                contact.phone,
-                contact.email,
-                str(contact.birthday) if contact.birthday else "",
-                contact.address,
-            )
-        self.messages.append(("table", table))
+        self.messages.append(("table", self.__render_contacts_table(contacts)))
 
     @handle_operation_errors
-    def __process_edit_contact_command(self, args: list[str]):
+    def __handle_edit_contact_command(self, args: list[str]):
         """Edit contact fields via CLI args or interactive prompts.
 
         Supports direct arguments (index [name] [phone] [email] [birthday] [address])
@@ -606,8 +522,12 @@ class PersonalAssistantCLI:
             "birthday": None,
             "address": None,
         }
+        max_index = len(self.contact_book.data)
+        if max_index == 0:
+            self.messages.append(("response", "There are no contacts to edit"))
+            return
         # CLI mode: parse arguments
-        if len(args) >= 1 and len(args) <= 6:
+        if len(args) > 1 and len(args) <= 6:
             index, *rest = args
             contact = self.contact_book.get(index)
             if not contact:
@@ -662,12 +582,15 @@ class PersonalAssistantCLI:
                     return
 
         # Interactive mode: show current values and prompt for changes
-        elif len(args) == 0:
-            index = self.__input_field(
-                "Enter index",
-                error_message=ERROR_MESSAGES["contacts"]["index"],
-                validator=self.contact_book.validate_index,
-            )
+        elif len(args) <= 1:
+            if len(args) == 0:
+                index = self.__input_field(
+                    "Enter index",
+                    error_message=ERROR_MESSAGES["contacts"]["index"](max_index),
+                    validator=self.contact_book.validate_index,
+                )
+            else:
+                index = args[0]
             contact = self.contact_book.get(index)
             if not contact:
                 self.messages.append(
@@ -675,51 +598,46 @@ class PersonalAssistantCLI:
                 )
                 return
 
-            self.console.print(
-                self.__render_message(
-                    "info",
-                    f"\nEditing contact: {contact.name}\n"
-                    f"Current phone: {contact.phone}\n"
-                    f"Current email: {contact.email or 'Not set'}\n"
-                    f"Current birthday: {str(contact.birthday) if contact.birthday else 'Not set'}\n"
-                    f"Current address: {contact.address or 'Not set'}\n",
-                )
-            )
             name = self.__input_field(
-                "Enter name",
+                "Edit name",
                 optional=True,
                 error_message=ERROR_MESSAGES["contacts"]["name"],
                 validator=Contact.validate_name,
+                placeholder=contact.name,
             )
             fields["name"] = name if name else None
 
             phone = self.__input_field(
-                "Enter phone",
+                "Edit phone",
                 optional=True,
                 error_message=ERROR_MESSAGES["contacts"]["phone"],
                 validator=Contact.validate_phone,
+                placeholder=contact.phone,
             )
             fields["phone"] = phone if phone else None
 
             email = self.__input_field(
-                "Enter email",
+                "Edit email",
                 optional=True,
                 error_message=ERROR_MESSAGES["contacts"]["email"],
                 validator=Contact.validate_email,
+                placeholder=contact.email,
             )
             fields["email"] = email if email else None
 
             birthday = self.__input_field(
-                "Enter birthday",
+                "Edit birthday",
                 optional=True,
                 error_message=ERROR_MESSAGES["contacts"]["birthday"],
                 validator=Contact.validate_birthday,
+                placeholder=str(contact.birthday) if contact.birthday else None,
             )
             fields["birthday"] = birthday if birthday else None
 
             address = self.__input_field(
-                "Enter address",
+                "Edit address",
                 optional=True,
+                placeholder=contact.address,
             )
             fields["address"] = address if address else None
 
@@ -742,23 +660,29 @@ class PersonalAssistantCLI:
             )
 
     @handle_operation_errors
-    def __process_delete_contact_command(self, args: list[str]):
+    def __handle_delete_contact_command(self, args: list[str]):
         """Delete contact from address book by index.
 
         Args:
             args: Command arguments containing contact index.
         """
         index = None
+        max_index = len(self.contact_book.data)
+        if max_index == 0:
+            self.messages.append(("response", "There are no contacts to delete"))
+            return
         if len(args) == 1:
             if self.contact_book.validate_index(args[0]):
                 index = args[0]
             else:
-                self.messages.append(("error", ERROR_MESSAGES["contacts"]["index"]))
+                self.messages.append(
+                    ("error", ERROR_MESSAGES["contacts"]["index"](max_index))
+                )
                 return
         elif len(args) == 0:
             index = self.__input_field(
                 "Enter index",
-                error_message=ERROR_MESSAGES["contacts"]["index"],
+                error_message=ERROR_MESSAGES["contacts"]["index"](max_index),
                 validator=self.contact_book.validate_index,
             )
         else:
@@ -778,7 +702,7 @@ class PersonalAssistantCLI:
             )
 
     @handle_operation_errors
-    def __process_birthdays_command(self, args: list[str]):
+    def __handle_birthdays_command(self, args: list[str]):
         """Show upcoming birthdays within specified day range.
 
         Args:
@@ -815,19 +739,16 @@ class PersonalAssistantCLI:
         if not upcoming_birthdays:
             self.messages.append(("response", "No upcoming birthdays found"))
             return
-        table = Table(title="Upcoming Birthdays")
-        table.add_column("Name", style="cyan", justify="left")
-        table.add_column("Birthday", style="magenta", justify="left")
-        table.add_column("Days", style="yellow", justify="left")
-        for birthday in upcoming_birthdays:
-            table.add_row(birthday["name"], birthday["birthday"], str(birthday["days"]))
-        self.messages.append(("table", table))
+
+        self.messages.append(
+            ("table", self.__render_birthdays_table(upcoming_birthdays))
+        )
 
     # endregion
 
     # region Note methods
     @handle_operation_errors
-    def __process_add_note_command(self, args: list[str]):
+    def __handle_add_note_command(self, args: list[str]):
         """Create new note.
 
         Args:
@@ -856,6 +777,8 @@ class PersonalAssistantCLI:
                 "Enter text",
                 error_message=ERROR_MESSAGES["notes"]["text"],
                 validator=Note.validate_text,
+                multiline=True,
+                lexer=PygmentsLexer(MarkdownLexer),
             )
             data["tags"] = self.__input_field(
                 "Enter tags",
@@ -874,21 +797,46 @@ class PersonalAssistantCLI:
             ("response", f'Note "{note.title}" added with tags "{note.tags_str}"')
         )
 
-    def __process_show_notes_command(self):
+    def __show_note(self, index: int):
+        note = self.note_book.get(index)
+        if not note:
+            self.messages.append(("error", ERROR_MESSAGES["notes"]["not_found"](index)))
+            return
+
+        self.messages.append(
+            (
+                "custom",
+                self.__render_note_details(note),
+            )
+        )
+
+    def __handle_show_notes_command(self, args: list[str]):
         """Display all notes in address book."""
+        index = None
+        max_index = len(self.note_book.data)
+
+        # If index is provided, show the note details
+        if len(args) == 1 and max_index > 0:
+            index = args[0]
+            if self.note_book.validate_index(index):
+                index = int(index)
+                return self.__show_note(index)
+            else:
+                self.messages.append(
+                    ("error", ERROR_MESSAGES["notes"]["index"](max_index))
+                )
+                return
+
+        # Otherwise, show all notes
         notes = self.note_book.data
         if not notes:
             self.messages.append(("response", "No notes found"))
             return
-        table = Table(title="Notes")
-        table.add_column("№", style="dim", justify="left")
-        table.add_column("Title", style="cyan", justify="left")
-        table.add_column("Tags", style="magenta", justify="left")
-        for index, note in enumerate(notes, start=1):
-            table.add_row(str(index), note.title, note.tags_str)
-        self.messages.append(("table", table))
 
-    def __process_find_note_command(self, args: list[str]):
+        self.messages.append(("table", self.__render_notes_table(notes)))
+
+    @handle_operation_errors
+    def __handle_find_note_command(self, args: list[str]):
         """Search notes by content or tags.
 
         Finds all notes matching the search term in either the note text
@@ -897,11 +845,30 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing search term.
         """
-        # TODO: Implement note search functionality
-        # Should search both note text content and tags
-        self.messages.append(("error", "Search functionality not yet implemented"))
+        data = {
+            "search": None,
+        }
+        if len(args) >= 1:
+            data["search"] = " ".join(args)
+        elif len(args) == 0:
+            data["search"] = self.__input_field(
+                "Enter search term",
+            )
+        else:
+            self.messages.append(
+                ("error", f"Usage: find-note {COMMAND_SIGNATURES['find-note']}")
+            )
+            return
 
-    def __process_edit_note_command(self, args: list[str]):
+        notes = self.note_book.find(data["search"])
+        if not notes:
+            self.messages.append(("response", "No notes found"))
+            return
+
+        self.messages.append(("table", self.__render_notes_table(notes)))
+
+    @handle_operation_errors
+    def __handle_edit_note_command(self, args: list[str]):
         """Edit existing note content and tags.
 
         Allows modifying the text content and/or tags of an existing note.
@@ -910,11 +877,94 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing note index and new content.
         """
-        # TODO: Implement note edit functionality
-        # Should update note text and/or tags based on provided arguments
-        self.messages.append(("error", "Edit functionality not yet implemented"))
+        fields = {
+            "text": None,
+            "tags": [],
+        }
+        max_index = len(self.note_book.data)
+        if max_index == 0:
+            self.messages.append(("response", "There are no notes to edit"))
+            return
+        # CLI mode: parse arguments
+        if len(args) > 1 and len(args) <= 3:
+            index, *rest = args
 
-    def __process_delete_note_command(self, args: list[str]):
+            note = self.note_book.get(index)
+            if not note:
+                self.messages.append(
+                    ("error", ERROR_MESSAGES["notes"]["not_found"](index))
+                )
+                return
+
+            if len(rest) >= 1 and rest[0]:
+                text = rest[0]
+                if Note.validate_text(text):
+                    fields["text"] = text
+                else:
+                    self.messages.append(("error", ERROR_MESSAGES["notes"]["text"]))
+                    return
+
+            if len(rest) >= 2 and rest[1]:
+                tags = rest[1]
+                if tags:
+                    fields["tags"] = tags.split(",")
+                else:
+                    fields["tags"] = []
+
+        # Interactive mode: show current values and prompt for changes
+        elif len(args) <= 1:
+            if len(args) == 0:
+                index = self.__input_field(
+                    "Enter index",
+                    error_message=ERROR_MESSAGES["notes"]["index"](max_index),
+                    validator=self.note_book.validate_index,
+                )
+            else:
+                index = args[0]
+            note = self.note_book.get(index)
+            if not note:
+                self.messages.append(
+                    ("error", ERROR_MESSAGES["notes"]["not_found"](index))
+                )
+                return
+
+            text = self.__input_field(
+                "Edit text",
+                optional=True,
+                error_message=ERROR_MESSAGES["notes"]["text"],
+                validator=Note.validate_text,
+                default=note.text,
+                multiline=True,
+                lexer=PygmentsLexer(MarkdownLexer),
+            )
+            fields["text"] = text if text else None
+
+            tags = self.__input_field(
+                "Edit tags",
+                optional=True,
+                error_message=ERROR_MESSAGES["notes"]["tags"],
+                default=note.tags_str,
+            ).split(",")
+            fields["tags"] = tags if tags else None
+
+        else:
+            # Invalid number of arguments
+            self.messages.append(
+                (
+                    "error",
+                    f"Usage: edit-contact {COMMAND_SIGNATURES['edit-contact']}",
+                )
+            )
+            return
+
+        # Update contact using the edit method
+        if self.note_book.edit(index, fields):
+            self.messages.append(("response", f'Note "{note.title}" updated'))
+        else:
+            self.messages.append(("error", ERROR_MESSAGES["notes"]["not_found"](index)))
+
+    @handle_operation_errors
+    def __handle_delete_note_command(self, args: list[str]):
         """Remove note from storage by index.
 
         Permanently deletes the note at the specified index from the notes book.
@@ -923,38 +973,88 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing note index.
         """
-        # TODO: Implement note delete functionality
-        # Should validate index and remove the corresponding note
-        self.messages.append(("error", "Delete functionality not yet implemented"))
+        index = None
+        max_index = len(self.note_book.data)
+        if max_index == 0:
+            self.messages.append(("response", "There are no notes to delete"))
+            return
+        if len(args) == 1:
+            if self.note_book.validate_index(args[0]):
+                index = args[0]
+            else:
+                self.messages.append(
+                    ("error", ERROR_MESSAGES["notes"]["index"](max_index))
+                )
+                return
+        elif len(args) == 0:
+            index = self.__input_field(
+                "Enter index",
+                error_message=ERROR_MESSAGES["notes"]["index"](max_index),
+                validator=self.note_book.validate_index,
+            )
+        else:
+            self.messages.append(
+                (
+                    "error",
+                    f"Usage: delete-note {COMMAND_SIGNATURES['delete-note']}",
+                )
+            )
+            return
 
-    def __process_find_tag_command(self, args: list[str]):
-        """Find all notes containing a specific tag.
+        if self.note_book.delete(index):
+            self.messages.append(("response", f'Note with index "{index}" deleted'))
+        else:
+            self.messages.append(("error", ERROR_MESSAGES["notes"]["not_found"](index)))
 
-        Searches through all notes and returns those that have the specified
-        tag in their tag list. Useful for organizing and retrieving notes
-        by category or topic.
+    @handle_operation_errors
+    def __handle_find_tag_command(self, args: list[str]):
+        """Search notes by content or tags.
+
+        Finds all notes matching the search term in either the note text
+        or associated tags. Displays results in a formatted table.
 
         Args:
-            args: Command arguments containing tag name to search for.
+            args: Command arguments containing search term.
         """
-        # TODO: Implement tag search functionality
-        # Should filter notes by matching tags and display results
-        self.messages.append(("error", "Tag search not yet implemented"))
+        data = {
+            "tags": [],
+        }
+        if len(args) >= 1:
+            data["tags"] = " ".join(args).split(",")
+        elif len(args) == 0:
+            data["tags"] = self.__input_field(
+                "Enter tags",
+            ).split(",")
+        else:
+            self.messages.append(
+                ("error", f"Usage: find-tag {COMMAND_SIGNATURES['find-tag']}")
+            )
+            return
 
-    def __process_sort_notes_by_tags_command(self):
+        notes = self.note_book.find_by_tag(data["tags"])
+        if not notes:
+            self.messages.append(("response", "No notes found with the given tags"))
+            return
+
+        self.messages.append(("table", self.__render_notes_table(notes)))
+
+    def __handle_sort_notes_by_tags_command(self):
         """Display notes grouped and sorted by tags.
 
         Organizes all notes by their associated tags, creating a grouped view
         that helps users see patterns and categories across their notes.
         Multiple tags per note cause the note to appear under each tag.
         """
-        # TODO: Implement notes grouping by tags
-        # Should create a hierarchical display organized by tag
-        self.messages.append(("error", "Sort by tags not yet implemented"))
+        notes = sorted(self.note_book)
+        if not notes:
+            self.messages.append(("response", "No notes found"))
+            return
+
+        self.messages.append(("table", self.__render_notes_table(notes)))
 
     # endregion
 
-    def __process_help_command(self):
+    def __handle_help_command(self):
         """Display all available commands for quick reference."""
         categories: dict[str, list[tuple[str, str]]] = {}
         for command, category in AVAILABLE_COMMANDS:
@@ -962,21 +1062,19 @@ class PersonalAssistantCLI:
                 categories[category] = []
             categories[category].append((command, COMMAND_SIGNATURES.get(command, "")))
 
-        help_text: list[tuple[str, str]] = [
-            ("Available commands:\n", "white bold"),
-        ]
+        help_text: list[tuple[str, str]] = []
         for category in categories.keys():
             help_text.append((f"{category.capitalize()} Commands:\n", "bold cyan"))
             help_text.append((("-" * 80) + "\n", "white"))
             for command, signature in categories[category]:
-                help_text.append((f"{command}", "green"))
+                help_text.append((f"\t{command} ", "green"))
                 help_text.append((signature or "", "white"))
                 help_text.append(("\n", ""))
             help_text.append(("\n", "white"))
 
         self.messages.append(("custom", Text.assemble(*help_text)))
 
-    def __process_command(self, command_str: str) -> str:
+    def __handle_command(self, command_str: str) -> str:
         """Parse command string and dispatch to appropriate handler.
 
         Args:
@@ -990,35 +1088,35 @@ class PersonalAssistantCLI:
             case "exit" | "q" | "quit":
                 self.exit(0)
             case "help" | "h" | "?":
-                self.__process_help_command()
+                self.__handle_help_command()
             case "clear" | "c" | "cls":
                 self.messages = []
             case "add-contact":
-                self.__process_add_contact_command(args)
+                self.__handle_add_contact_command(args)
             case "show-contacts":
-                self.__process_show_contacts_command()
+                self.__handle_show_contacts_command()
             case "find-contact":
-                self.__process_find_contact_command(args)
+                self.__handle_find_contact_command(args)
             case "edit-contact":
-                self.__process_edit_contact_command(args)
+                self.__handle_edit_contact_command(args)
             case "delete-contact":
-                self.__process_delete_contact_command(args)
+                self.__handle_delete_contact_command(args)
             case "birthdays":
-                self.__process_birthdays_command(args)
+                self.__handle_birthdays_command(args)
             case "add-note":
-                self.__process_add_note_command(args)
+                self.__handle_add_note_command(args)
             case "show-notes":
-                self.__process_show_notes_command()
+                self.__handle_show_notes_command(args)
             case "find-note":
-                self.__process_find_note_command(args)
+                self.__handle_find_note_command(args)
             case "edit-note":
-                self.__process_edit_note_command(args)
+                self.__handle_edit_note_command(args)
             case "delete-note":
-                self.__process_delete_note_command(args)
+                self.__handle_delete_note_command(args)
             case "find-tag":
-                self.__process_find_tag_command(args)
+                self.__handle_find_tag_command(args)
             case "sort-notes-by-tags":
-                self.__process_sort_notes_by_tags_command()
+                self.__handle_sort_notes_by_tags_command()
             case _:
                 suggestion = suggest_command(command)
                 error_msg = f"Unknown command: `{command}`"
@@ -1072,34 +1170,6 @@ class PersonalAssistantCLI:
                 self.messages.append(("error", "Command cannot be empty"))
                 continue
             self.messages.append(("command", command))
-            self.__process_command(command)
+            self.__handle_command(command)
 
     # endregion
-
-
-class OperationCancelledError(Exception):
-    """Exception raised when the user cancels an operation."""
-
-    pass
-
-
-def suggest_command(user_command: str) -> str | None:
-    """Find the closest matching command from available commands using fuzzy matching.
-
-    Uses difflib's get_close_matches to suggest commands when a user types
-    an incorrect or misspelled command. Helps users discover the correct command
-    name without needing to reference documentation.
-
-    Args:
-        user_command: The command string to match against available commands.
-
-    Returns:
-        The closest matching command name, or None if no adequate match found
-        (matches require 50% similarity cutoff).
-    """
-    matches = get_close_matches(
-        user_command, [cmd[0] for cmd in AVAILABLE_COMMANDS], n=1, cutoff=0.5
-    )
-    if matches:
-        return matches[0]
-    return None
