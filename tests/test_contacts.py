@@ -173,7 +173,7 @@ class TestContactDataclass:
         assert contact.name == "Bob"
         assert contact.phone == "+38050222333444"
         assert contact.email is None
-        assert contact.birthday.value is None
+        assert contact.birthday is None
         assert contact.address is None
 
 
