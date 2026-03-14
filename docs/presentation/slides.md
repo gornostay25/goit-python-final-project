@@ -5,17 +5,17 @@ title: Personal Assistant CLI
 class: text-center
 info: |
   ## Personal Assistant CLI - Team Project Presentation
-  CodeFlow Team - Python CLI Application
+  Горностайчики Team 🦄 - Python CLI Application
 ---
 
 # Personal Assistant CLI
 
 <div class="text-xl opacity-80 mt-4">
-  Team Project Presentation
+  "Горностайчики" Team Project Presentation
 </div>
 
 <div class="text-sm opacity-60 mt-12">
-  Python CLI Application • CodeFlow Team
+  Neoversity Python Course • 2026
 </div>
 
 ---
@@ -187,6 +187,11 @@ layout: center
 
 # Проблеми та рішення
 
+Multiline input conflict
+UA phone to E.164 format
+UNIT tests CI/CD
+
+
 <div class="grid grid-cols-2 gap-8 max-w-5xl mx-auto mt-8">
   <div class="space-y-6">
     <div class="text-2xl font-bold text-red-400 mb-4">❌ Проблеми</div>
@@ -321,5 +326,6 @@ layout: center
 </div>
 
 <div class="mt-4 text-sm opacity-60">
-  CodeFlow Team • 2024
+  Горностайчики Team 🦄 • 2026
 </div>
+~~
