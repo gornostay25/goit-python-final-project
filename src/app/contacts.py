@@ -1,8 +1,8 @@
 import re
-from dataclasses import asdict, dataclass
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import date, datetime
 
-from app.book import Book
+from app.book import Book, Item
 
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 PHONE_REGEX = r"^\+\d{1,3}\d{9,11}$"
@@ -22,8 +22,6 @@ class Birthday:
     def __eq__(self, value: object, /) -> bool:
         if isinstance(value, Birthday):
             return self.value == value.value
-        if isinstance(value, datetime.date):
-            return self.value == value
         if isinstance(value, str):
             return self.value == datetime.strptime(value, DATE_FORMAT).date()
         return False
@@ -41,16 +39,26 @@ class Birthday:
     @value.setter
     def value(self, new_value):
         try:
-            if not new_value or not new_value.strip():
+            if new_value is not None and not isinstance(
+                new_value, (str, date, Birthday)
+            ):
+                raise ValueError(f"Invalid type: {type(new_value)}")
+
+            if isinstance(new_value, str) and len(new_value.strip()) > 0:
+                self._value = datetime.strptime(new_value, DATE_FORMAT).date()
+            elif isinstance(new_value, date):
+                self._value = new_value
+            elif isinstance(new_value, Birthday):
+                self._value = new_value.value
+            else:
                 self._value = None
-                return
-            self._value = datetime.strptime(new_value, DATE_FORMAT).date()
+
         except ValueError as e:
             raise ValueError("Invalid date format. Use DD.MM.YYYY") from e
 
 
 @dataclass
-class Contact:
+class Contact(Item):
     """Represents a contact in the address book.
 
     Stores personal information including name, phone, email, birthday,
@@ -70,28 +78,12 @@ class Contact:
     birthday: Birthday = None
     address: str = None
 
-    def to_dict(self) -> dict:
-        """Convert contact to dictionary for serialization."""
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "Contact":
-        """
-        Create Contact instance from dictionary.
-
-        Args:
-            data: Dictionary containing contact fields with optional values.
-
-        Returns:
-            Contact: New Contact instance with values from dict.
-        """
-        return cls(
-            data.get("name"),
-            data.get("phone"),
-            data.get("email"),
-            Birthday(data.get("birthday")),
-            data.get("address"),
-        )
+    def __post_init__(self):
+        self.name = self.name.strip()
+        self.phone = self.phone.strip()
+        self.email = self.email.strip() if self.email else None
+        self.address = self.address.strip() if self.address else None
+        self.birthday = Birthday(self.birthday) if self.birthday else None
 
     # region Validation methods
     @staticmethod
@@ -160,6 +152,8 @@ class ContactBook(Book[Contact]):
     Extends UserList to provide list-like access while adding domain-specific
     operations for contact management.
     """
+
+    item_type = Contact
 
     def find(self, search: str) -> list[Contact]:
         """Search all contact fields for matching terms.
@@ -262,14 +256,3 @@ class ContactBook(Book[Contact]):
             contact.birthday = Birthday(fields["birthday"])
 
         return True
-
-    def load_from_list(self, data: list[dict]) -> None:
-        """Load contacts from list of dictionaries for deserialization.
-
-        Replaces existing contact data with the provided data. Used to
-        restore contacts from persistent storage like JSON files.
-
-        Args:
-            data: List of contact dictionaries to load.
-        """
-        self.data = [Contact.from_dict(item) for item in data]

@@ -3,6 +3,7 @@
 from app.cli import PersonalAssistantCLI
 from app.contacts import Contact, ContactBook
 from app.notes import Note, NotesBook
+from app.storage import Storage
 
 test_contacts = [
     {
@@ -65,12 +66,19 @@ test_notes = [
     ),
 ]
 
+CONTACTS_FILE = "contacts.json"
+NOTES_FILE = "notes.json"
+
 if __name__ == "__main__":
     contact_book = ContactBook()
+    contact_storage = Storage(contact_book, CONTACTS_FILE)
+    contact_storage.load()
+
     note_book = NotesBook()
+    note_storage = Storage(note_book, NOTES_FILE)
+    note_storage.load()
 
     cli = PersonalAssistantCLI(contact_book, note_book)
-    cli.load_content()
 
     if len(contact_book) == 0:
         for contact_data in test_contacts:
@@ -86,4 +94,5 @@ if __name__ == "__main__":
     except Exception:
         cli.console.print_exception(show_locals=True)
     finally:
-        cli.save_content()
+        contact_storage.save()
+        note_storage.save()

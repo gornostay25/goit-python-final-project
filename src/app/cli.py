@@ -222,13 +222,16 @@ class PersonalAssistantCLI:
             title="Contacts",
             show_lines=True,
         )
+        table.add_column("№", style="dim", justify="left")
         table.add_column("Name", style="cyan", justify="left")
         table.add_column("Phone", style="green", justify="left")
         table.add_column("Email", style="blue", justify="left")
         table.add_column("Birthday", style="magenta", justify="left")
         table.add_column("Address", style="yellow", justify="left")
         for contact in contacts:
+            original_index = self.contact_book.data.index(contact) + 1
             table.add_row(
+                str(original_index),
                 contact.name,
                 contact.phone,
                 contact.email,
@@ -1161,21 +1164,6 @@ class PersonalAssistantCLI:
     # endregion
 
     # region Public methods
-    def load_content(self) -> None:
-        """Load contact and note data from persistent storage.
-
-        Reads saved contacts and notes from disk to restore the application
-        state between sessions. Currently displays a placeholder message.
-        """
-        self.console.print("[bold green]Loading content from files...[/bold green]")
-
-    def save_content(self) -> None:
-        """Save contact and note data to persistent storage.
-
-        Persists all contacts and notes to disk to ensure data survives
-        application restarts. Currently displays a placeholder message.
-        """
-        self.console.print("[bold green]Saving content to files...[/bold green]")
 
     def exit(self, code: int = 0):
         """Exit the application cleanly with specified code.

@@ -1,5 +1,6 @@
 from collections import UserList
-from typing import TypeVar
+from dataclasses import asdict
+from typing import Dict, List, TypeVar
 
 T = TypeVar("T")
 
@@ -14,6 +15,8 @@ class Book(UserList[T]):
     Type Parameters:
         T: The type of items stored in the book.
     """
+
+    item_type: T = None
 
     def get(self, index: int | str) -> T | None:
         """Retrieve item by 1-based index.
@@ -82,3 +85,55 @@ class Book(UserList[T]):
             True if index is valid, False otherwise.
         """
         return index.isdigit() and int(index) > 0 and int(index) <= len(self.data)
+
+    def load_from_list(self, data: List[Dict]) -> None:
+        """Load items from list of dictionaries, handling errors gracefully.
+
+        Replaces existing data with loaded items. Skips corrupted or invalid
+        items rather than failing entirely, allowing partial data recovery.
+        This fail-safe approach ensures data durability even when some items
+        are malformed.
+
+        Args:
+            data: List of dictionaries to deserialize into items.
+
+        Note:
+            Requires item_type class variable to be set by subclass.
+        """
+        loaded_items = []
+        for item in data:
+            try:
+                loaded_items.append(self.item_type.from_dict(item))
+            except Exception:
+                continue
+        self.data = loaded_items
+
+
+class Item:
+    """Base class for serializable items stored in Book collections."""
+
+    def to_dict(self) -> dict:
+        """Convert item to dictionary for serialization."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Item":
+        """Create Item instance from dictionary data.
+
+        Only loads fields that exist in class annotations, gracefully ignoring
+        unknown fields. This allows schema evolution where old data may contain
+        fields not present in newer class versions.
+
+        Args:
+            data: Dictionary containing field-value pairs for initialization.
+
+        Returns:
+            New Item instance with loaded fields.
+        """
+        fields = {}
+
+        for field, value in data.items():
+            if field in cls.__annotations__:
+                fields[field] = value
+
+        return cls(**fields)

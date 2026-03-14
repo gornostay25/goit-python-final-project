@@ -1,10 +1,10 @@
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 
-from app.book import Book
+from app.book import Book, Item
 
 
 @dataclass()
-class Note:
+class Note(Item):
     """Represents a text note with optional tags.
 
     Notes support text content and categorization via tags. Tags are
@@ -74,32 +74,6 @@ class Note:
         """
         return ", ".join(sorted(tag for tag in self.tags))
 
-    def to_dict(self):
-        """Convert note to dictionary for serialization.
-
-        Uses dataclass asdict() to convert all fields to
-        dictionary format suitable for JSON storage.
-
-        Returns:
-            Dictionary containing note text and tags.
-        """
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data):
-        """Create Note instance from dictionary.
-
-        Reconstructs note from serialized data. Handles missing fields
-        gracefully with defaults.
-
-        Args:
-            data: Dictionary containing 'text' and optional 'tags' fields.
-
-        Returns:
-            New Note instance with values from dict.
-        """
-        return cls(data.get("text", ""), data.get("tags", []))
-
     @staticmethod
     def _clean_tags(tags: list[str] | None = None) -> list[str]:
         """Normalize tags by cleaning and deduplicating.
@@ -139,6 +113,8 @@ class NotesBook(Book[Note]):
     Extends Book to provide list-like access while adding domain-specific
     operations for note management including text search and tag filtering.
     """
+
+    item_type = Note
 
     def get(self, index: int | str) -> Note | None:
         """Retrieve note by 1-based index.
@@ -227,14 +203,3 @@ class NotesBook(Book[Note]):
             note.tags = fields["tags"]
 
         return True
-
-    def load_from_list(self, data):
-        """Load notes from list of dictionaries for deserialization.
-
-        Replaces existing note data with provided data. Used to
-        restore notes from persistent storage like JSON files.
-
-        Args:
-            data: List of note dictionaries to load.
-        """
-        self.data = [Note.from_dict(item) for item in data]

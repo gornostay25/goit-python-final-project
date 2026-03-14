@@ -159,11 +159,10 @@ class TestNoteDataclass:
         assert note.tags == []
 
     def test_from_dict_empty_text_uses_default(self):
-        """Test from_dict uses empty string default for missing text."""
+        """Test from_dict raises error for missing text."""
         data = {}
-        note = Note.from_dict(data)
-        assert note.text == ""
-        assert note.tags == []
+        with pytest.raises(TypeError):
+            Note.from_dict(data)
 
     def test_post_init_cleans_tags(self):
         """Test __post_init__ cleans tags on creation."""

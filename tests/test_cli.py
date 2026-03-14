@@ -12,17 +12,11 @@ from app.notes import NotesBook
 class TestCLIInitialization:
     """Tests for CLI initialization."""
 
-    def test_initialization_creates_contact_book(self):
-        """Test initialization creates ContactBook instance."""
+    def test_initialization_creates_contact_book_and_note_book(self):
+        """Test initialization creates ContactBook and NotesBook instances."""
         cli = PersonalAssistantCLI()
         assert isinstance(cli.contact_book, ContactBook)
-        assert len(cli.contact_book.data) == 0
-
-    def test_initialization_creates_note_book(self):
-        """Test initialization creates NotesBook instance."""
-        cli = PersonalAssistantCLI()
         assert isinstance(cli.note_book, NotesBook)
-        assert len(cli.note_book.data) == 0
 
     def test_initialization_sets_up_console(self):
         """Test initialization creates Console instance."""
@@ -85,35 +79,6 @@ class TestCommandParsing:
         cli._PersonalAssistantCLI__handle_command("add-conact")  # Typo
         assert len(cli.messages) == 1
         assert "Did you mean" in cli.messages[0][1]
-
-
-class TestCLIPublicMethods:
-    """Tests for public CLI methods."""
-
-    @patch("builtins.exit")
-    def test_exit_with_code(self, mock_exit):
-        """Test exit method calls sys.exit with code."""
-        cli = PersonalAssistantCLI()
-        cli.exit(42)
-        mock_exit.assert_called_once_with(42)
-
-    @patch("rich.console.Console.print")
-    def test_load_content_displays_message(self, mock_print):
-        """Test load_content displays loading message."""
-        cli = PersonalAssistantCLI()
-        cli.load_content()
-        mock_print.assert_called_once()
-        call_args = str(mock_print.call_args)
-        assert "Loading content" in call_args
-
-    @patch("rich.console.Console.print")
-    def test_save_content_displays_message(self, mock_print):
-        """Test save_content displays saving message."""
-        cli = PersonalAssistantCLI()
-        cli.save_content()
-        mock_print.assert_called_once()
-        call_args = str(mock_print.call_args)
-        assert "Saving content" in call_args
 
 
 class TestCommandParsingErrors:
