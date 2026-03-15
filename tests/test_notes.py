@@ -44,10 +44,6 @@ class TestNoteValidation:
 class TestNoteProperties:
     """Tests for Note property methods."""
 
-    def test_title_extracts_first_line(self, sample_note):
-        """Test title extracts first 10 characters of first line."""
-        assert sample_note.title == "This is a"
-
     def test_title_single_line_short(self):
         """Test title with short text."""
         note = Note(text="Short")
@@ -58,10 +54,11 @@ class TestNoteProperties:
         note = Note(text="First line\nSecond line\nThird line")
         assert note.title == "First line"
 
-    def test_title_truncates_to_10_chars(self):
-        """Test title is limited to 10 characters."""
-        note = Note(text="This is a very long title that should be truncated")
-        assert note.title == "This is a"
+    def test_title_truncates_to_30_chars(self):
+        """Test title is limited to 30 characters."""
+        text = "This is a very long title that should be truncated"
+        note = Note(text=text)
+        assert note.title == text[:30]
 
     def test_title_strips_whitespace(self):
         """Test title strips trailing whitespace."""
@@ -158,10 +155,12 @@ class TestNoteDataclass:
         assert note.text == "Note"
         assert note.tags == []
 
-    def test_from_dict_empty_text_uses_default(self):
-        """Test from_dict raises error for missing text."""
+    def test_from_dict_missing_text_raises_error(self):
+        """Test from_dict raises TypeError when required text field is missing."""
         data = {}
-        with pytest.raises(TypeError):
+        with pytest.raises(
+            TypeError, match="missing 1 required positional argument: 'text'"
+        ):
             Note.from_dict(data)
 
     def test_post_init_cleans_tags(self):

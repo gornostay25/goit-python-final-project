@@ -2,6 +2,7 @@
 
 from shlex import split as shlex_split
 from time import sleep
+from typing import Callable
 
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import InMemoryHistory
@@ -22,6 +23,7 @@ from rich.text import Text
 from app import __authors__, __description__, __version__
 from app.contacts import Contact, ContactBook
 from app.notes import Note, NotesBook
+from app.types import BirthdayInfo, ContactEditFields, MessageType, NoteEditFields
 from app.utils import (
     AVAILABLE_COMMANDS,
     COMMAND_SIGNATURES,
@@ -48,7 +50,7 @@ class PersonalAssistantCLI:
         """Initialize CLI components and data books."""
         self.console = Console()
         self.console.set_window_title("Personal Assistant")
-        self.messages: list[tuple[str, RenderableType]] = []
+        self.messages: list[tuple[MessageType, RenderableType]] = []
 
         self.contact_book = contact_book
         self.note_book = note_book
@@ -60,15 +62,17 @@ class PersonalAssistantCLI:
         self.command_session = PromptSession(history=history, completer=completer)
 
     # region Render methods
-    def __render_message(self, msg_type: str, msg_text: RenderableType) -> Text:
+    def __render_message(
+        self, msg_type: MessageType, msg_text: RenderableType
+    ) -> RenderableType:
         """Apply color styling to messages based on type.
 
         Args:
-            msg_type: Message type ("command", "response", "error", "info", "custom").
+            msg_type: Message type ("command", "response", "error", "info", "custom", "table").
             msg_text: The text content to render.
 
         Returns:
-            Text: Styled text object ready for display.
+            Styled text object or original renderable for custom/table types.
         """
         if msg_type == "command":
             return Text(f"> {msg_text}", style="green bold")
@@ -240,11 +244,11 @@ class PersonalAssistantCLI:
             )
         return table
 
-    def __render_birthdays_table(self, upcoming_birthdays: list[dict]):
+    def __render_birthdays_table(self, upcoming_birthdays: list[BirthdayInfo]):
         """Render upcoming birthdays data into a Rich table.
 
         Args:
-            upcoming_birthdays: List of dictionaries with birthday information.
+            upcoming_birthdays: List of BirthdayInfo with birthday information.
 
         Returns:
             Configured Rich Table with upcoming birthdays.
@@ -254,7 +258,8 @@ class PersonalAssistantCLI:
         table.add_column("Birthday", style="magenta", justify="left")
         table.add_column("Days", style="yellow", justify="left")
         for birthday in upcoming_birthdays:
-            table.add_row(birthday["name"], birthday["birthday"], str(birthday["days"]))
+            days = birthday["days"] if birthday["days"] > 0 else "Today"
+            table.add_row(birthday["name"], birthday["birthday"], days)
         return table
 
     def __render_notes_table(self, notes: list[Note]):
@@ -297,7 +302,7 @@ class PersonalAssistantCLI:
     # endregion
 
     # region Input methods
-    def __input_command(self) -> str:
+    def __input_command(self) -> str | None:
         """Prompt for command input with autocompletion and history.
 
         Returns:
@@ -315,7 +320,7 @@ class PersonalAssistantCLI:
         message: str,
         optional: bool = False,
         error_message: str = "Invalid input",
-        validator: callable = None,
+        validator: Callable[[str], bool] | None = None,
         placeholder: str | None = None,
         default: str = "",
         multiline: bool = False,
@@ -345,7 +350,9 @@ class PersonalAssistantCLI:
         ptk_validator = None
         if validator:
             ptk_validator = Validator.from_callable(
-                validate_func=lambda x: True if optional and not x else validator(x),
+                validate_func=lambda x: (
+                    True if optional and not x.strip() else validator(x)
+                ),
                 error_message=error_message,
                 move_cursor_to_end=True,
             )
@@ -391,7 +398,7 @@ class PersonalAssistantCLI:
         Returns:
             Contact information or None on cancellation.
         """
-        data = {
+        data: ContactEditFields = {
             "name": None,
             "phone": None,
             "email": None,
@@ -552,7 +559,7 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments. If empty, prompts interactively.
         """
-        fields = {
+        fields: ContactEditFields = {
             "name": None,
             "phone": None,
             "email": None,
@@ -787,12 +794,13 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing note content.
         """
-        data = {
+        data: NoteEditFields = {
             "text": None,
-            "tags": [],
+            "tags": None,
         }
-        if len(args) == 2:
-            text, tags = args
+        if 2 >= len(args) > 0:
+            text = args[0]
+            tags = args[1] if len(args) == 2 else None
             if Note.validate_text(text):
                 data["text"] = text
             else:
@@ -826,7 +834,11 @@ class PersonalAssistantCLI:
         note = Note.from_dict(data)
         self.note_book.append(note)
         self.messages.append(
-            ("response", f'Note "{note.title}" added with tags "{note.tags_str}"')
+            (
+                "response",
+                f'Note "{note.title}" added'
+                + (f' with tags "{note.tags_str}"' if note.tags else ""),
+            )
         )
 
     def __show_note(self, index: int):
@@ -907,9 +919,9 @@ class PersonalAssistantCLI:
         Args:
             args: Command arguments containing note index and new content.
         """
-        fields = {
+        fields: NoteEditFields = {
             "text": None,
-            "tags": [],
+            "tags": None,
         }
         max_index = len(self.note_book.data)
         if max_index == 0:
@@ -1082,7 +1094,7 @@ class PersonalAssistantCLI:
 
     # endregion
 
-    def __handle_help_command(self):
+    def __handle_help_command(self) -> None:
         """Display all available commands for quick reference."""
         categories: dict[str, list[tuple[str, str]]] = {}
         for command, category in AVAILABLE_COMMANDS:
@@ -1102,14 +1114,11 @@ class PersonalAssistantCLI:
 
         self.messages.append(("custom", Text.assemble(*help_text)))
 
-    def __handle_command(self, command_str: str) -> str:
+    def __handle_command(self, command_str: str) -> None:
         """Parse command string and dispatch to appropriate handler.
 
         Args:
             command_str: Raw command string from user input.
-
-        Returns:
-            Command status or None.
         """
 
         try:

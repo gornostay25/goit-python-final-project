@@ -31,19 +31,18 @@ class Storage:
                 self.book.to_list(), file, ensure_ascii=False, indent=4, default=str
             )
 
-    def load(self):
+    def load(self) -> None:
         """Restore book data from JSON file.
 
         If file doesn't exist or contains invalid JSON, initializes book with
         empty data. Handles malformed items gracefully via Book.load_from_list().
         """
         if not os.path.exists(self.filename):
-            return []
+            return
         with open(self.filename, "r", encoding="utf-8") as file:
             try:
                 self.book.load_from_list(json.load(file))
             except json.JSONDecodeError:
-                return []
+                pass
             except Exception as e:
                 print(f"Error loading data from {self.filename}: {e}")
-                return []
