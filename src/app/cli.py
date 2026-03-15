@@ -258,7 +258,8 @@ class PersonalAssistantCLI:
         table.add_column("Birthday", style="magenta", justify="left")
         table.add_column("Days", style="yellow", justify="left")
         for birthday in upcoming_birthdays:
-            table.add_row(birthday["name"], birthday["birthday"], str(birthday["days"]))
+            days = birthday["days"] if birthday["days"] > 0 else "Today"
+            table.add_row(birthday["name"], birthday["birthday"], days)
         return table
 
     def __render_notes_table(self, notes: list[Note]):

@@ -6,6 +6,10 @@ A command-line Personal Assistant for managing contacts and notes. Built as a fi
 
 This Personal Assistant is designed to help you manage your personal information efficiently through an intuitive command-line interface. It serves as both a practical application and a demonstration of team collaboration, software development best practices, and project management skills.
 
+## Demo
+
+![Demo Asciinema](./docs/demo.gif)
+
 ### Key Features
 
 - **Contact Management**
