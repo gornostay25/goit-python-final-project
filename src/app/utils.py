@@ -159,7 +159,7 @@ def handle_operation_errors(func):
         try:
             return func(self, *args, **kwargs)
         except OperationCancelledError:
-            # Silently handle user cancellation without showing errors
+            # Silently handle user cancellation without raising errors
             return
         except Exception as e:
             self.messages.append(("error", f"Error: {e}"))

@@ -2,7 +2,8 @@ import re
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from app.book import Book, Item
+from app.book import Book, BookItem
+from app.types import BirthdayInfo, ContactEditFields
 
 EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 PHONE_REGEX = r"^\+\d{1,3}\d{9,11}$"
@@ -58,7 +59,7 @@ class Birthday:
 
 
 @dataclass
-class Contact(Item):
+class Contact(BookItem):
     """Represents a contact in the address book.
 
     Stores personal information including name, phone, email, birthday,
@@ -74,9 +75,9 @@ class Contact(Item):
 
     name: str
     phone: str
-    email: str = None
-    birthday: Birthday = None
-    address: str = None
+    email: str | None = None
+    birthday: Birthday | None = None
+    address: str | None = None
 
     def __post_init__(self):
         self.name = self.name.strip()
@@ -183,7 +184,7 @@ class ContactBook(Book[Contact]):
                 found.append(contact)
         return found
 
-    def upcoming_birthdays(self, days: int) -> list[dict]:
+    def upcoming_birthdays(self, days: int) -> list[BirthdayInfo]:
         """Find contacts with birthdays occurring within the next N days.
 
         Calculates upcoming birthdays for the current year, wrapping to
@@ -198,7 +199,7 @@ class ContactBook(Book[Contact]):
         """
 
         today = datetime.today().date()
-        result: list[dict] = []
+        result: list[BirthdayInfo] = []
 
         for contact in self.data:
             if not contact.birthday or not contact.birthday.value:
@@ -221,7 +222,7 @@ class ContactBook(Book[Contact]):
 
         return result
 
-    def edit(self, index: int | str, fields: dict) -> bool:
+    def edit(self, index: int | str, fields: ContactEditFields) -> bool:
         """Update contact fields with validated values.
 
         Only updates fields that are present and non-empty in the dictionary.

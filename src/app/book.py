@@ -1,6 +1,6 @@
 from collections import UserList
 from dataclasses import asdict
-from typing import Dict, List, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -16,7 +16,7 @@ class Book(UserList[T]):
         T: The type of items stored in the book.
     """
 
-    item_type: T = None
+    item_type: type[T] | None = None
 
     def get(self, index: int | str) -> T | None:
         """Retrieve item by 1-based index.
@@ -84,9 +84,14 @@ class Book(UserList[T]):
         Returns:
             True if index is valid, False otherwise.
         """
-        return index.isdigit() and int(index) > 0 and int(index) <= len(self.data)
+        if isinstance(index, str):
+            try:
+                index = int(index)
+            except ValueError:
+                return False
+        return 0 < index <= len(self.data)
 
-    def load_from_list(self, data: List[Dict]) -> None:
+    def load_from_list(self, data: list[dict]) -> None:
         """Load items from list of dictionaries, handling errors gracefully.
 
         Replaces existing data with loaded items. Skips corrupted or invalid
@@ -101,6 +106,8 @@ class Book(UserList[T]):
             Requires item_type class variable to be set by subclass.
         """
         loaded_items = []
+        if not self.item_type:
+            raise ValueError("item_type is not set")
         for item in data:
             try:
                 loaded_items.append(self.item_type.from_dict(item))
@@ -109,7 +116,7 @@ class Book(UserList[T]):
         self.data = loaded_items
 
 
-class Item:
+class BookItem:
     """Base class for serializable items stored in Book collections."""
 
     def to_dict(self) -> dict:
@@ -117,7 +124,7 @@ class Item:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Item":
+    def from_dict(cls, data: dict):
         """Create Item instance from dictionary data.
 
         Only loads fields that exist in class annotations, gracefully ignoring
