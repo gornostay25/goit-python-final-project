@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
 
-from app.book import Book, Item
+from app.book import Book, BookItem
+from app.types import NoteEditFields
 
 
 @dataclass()
-class Note(Item):
+class Note(BookItem):
     """Represents a text note with optional tags.
 
     Notes support text content and categorization via tags. Tags are
@@ -55,13 +56,13 @@ class Note(Item):
     def title(self) -> str:
         """Generate short title from note text.
 
-        Takes the first line of text and truncates to 10 characters.
+        Takes the first line of text and truncates to 30 characters.
         Used for compact display in tables and lists.
 
         Returns:
             Short title string for display purposes.
         """
-        return self.text.split("\n")[0][:10].strip()
+        return self.text.split("\n")[0][:30].strip()
 
     @property
     def tags_str(self) -> str:
@@ -116,27 +117,6 @@ class NotesBook(Book[Note]):
 
     item_type = Note
 
-    def get(self, index: int | str) -> Note | None:
-        """Retrieve note by 1-based index.
-
-        Handles both string and integer indices, converting them to
-        internal 0-based position automatically.
-
-        Args:
-            index: 1-based index of note to retrieve.
-
-        Returns:
-            Note instance if found, None otherwise.
-        """
-        if isinstance(index, str) and index.isdigit():
-            index = int(index)
-        elif not isinstance(index, int):
-            return None
-
-        if index < 1 or index > len(self.data):
-            return None
-        return self.data[index - 1]
-
     def find(self, search: str) -> list[Note]:
         """Search notes by text content or tags.
 
@@ -177,7 +157,7 @@ class NotesBook(Book[Note]):
                 found.append(note)
         return found
 
-    def edit(self, index: int | str, fields: dict) -> bool:
+    def edit(self, index: int | str, fields: NoteEditFields) -> bool:
         """Update note fields with validated values.
 
         Only updates fields that are present and non-empty in the dictionary.

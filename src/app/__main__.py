@@ -45,23 +45,23 @@ test_contacts = [
 
 test_notes = [
     Note(
-        text="This is another test note\nThis is a **test note**\nThis is a test note",
+        text="This is another test note\n\nThis is a **test note**\n\nThis *is* a test ~~note~~",
         tags=["test2", "b"],
     ),
     Note(
-        text="This is a test note\nThis is a **test note**\nThis is a test note",
+        text="This is a test note\n\nThis is a **test note**\n\nThis *is* a test ~~note~~",
         tags=["test1", "a"],
     ),
     Note(
-        text="This is a fourth test note\nThis is a **test note**\nThis is a test note",
+        text="This is a fourth test note\n\nThis is a **test note**\n\nThis *is* a test ~~note~~",
         tags=["test4", "d"],
     ),
     Note(
-        text="This is a third test note\nThis is a **test note**\nThis is a test note",
+        text="This is a third test note\n\nThis is a **test note**\n\nThis *is* a test ~~note~~",
         tags=["test3", "c"],
     ),
     Note(
-        text="This is a fifth test note\nThis is a **test note**\nThis is a test note",
+        text="This is a fifth test note\n\nThis is a **test note**\n\nThis *is* a test ~~note~~",
         tags=["test5", "e"],
     ),
 ]

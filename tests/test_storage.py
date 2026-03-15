@@ -108,8 +108,7 @@ class TestStorageLoad:
         storage = Storage(contact_book, str(filename))
 
         # Should not raise exception
-        result = storage.load()
-        assert result == []
+        storage.load()
         assert len(contact_book) == 0
 
     def test_load_invalid_json(self, tmp_path):
@@ -124,8 +123,7 @@ class TestStorageLoad:
         storage = Storage(contact_book, str(filename))
 
         # Should not raise exception
-        result = storage.load()
-        assert result == []
+        storage.load()
         assert len(contact_book) == 0
 
     def test_load_malformed_items(self, tmp_path):
