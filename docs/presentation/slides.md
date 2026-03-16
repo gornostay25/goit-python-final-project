@@ -18,15 +18,17 @@ info: |
   Neoversity Python Course • 2026
 </div>
 
+<!--
+Всім привіт ми команда горностайчики і сьогодні будемо презентувати нащ проєкт Personal Assistant CLI.
+-->
+
 ---
 layout: center
 class: text-center
 transition: view-transition
 ---
 
-<div class="text-6xl mb-8">👥</div>
-
-# Учасники команди
+# 👥 Учасники команди
 
 <div class="grid grid-cols-2 gap-8 mt-12 max-w-4xl mx-auto">
   <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-left">
@@ -51,6 +53,12 @@ transition: view-transition
   </div>
 </div>
 
+<!--
+Наша команда складається з чотирьох учасників: Мене, Людмили, Аурики і Даніїла
+
+Ми об'єднали свої навички щоб зробити кінцевий продукт гарним і функціональним
+-->
+
 ---
 layout: two-cols
 transition: slide-left
@@ -74,6 +82,10 @@ transition: slide-left
     { icon: '🔧', text: 'Feature integration' }
   ]"
 />
+
+<!--
+В мене звати Володимир, я Team Lead нашої команди. Я відповідаю за архітектурний дизайн нашого застосунку, проводив код-рев'ю та допомагав інтегрувати нові функції в основну систему.
+-->
 
 ---
 layout: two-cols
@@ -100,6 +112,15 @@ transition: slide-left
   ]"
 />
 
+<!--
+Людмили, виконувала роль Scrum Master.
+Вона займалася:
+- координацією команди
+- плануванням спринтів
+- управління завданнями
+- та забезпеченням відкритого комунікації всередині команди.
+-->
+
 ---
 layout: two-cols
 transition: slide-left
@@ -124,9 +145,14 @@ transition: slide-left
   ]"
 />
 
+<!--
+Наступний учасник команди - Аурика.
+
+Як розробник, вона відповідала за розробку модуля **контактів**, А також тестування і виправлення багів
+-->
+
 ---
 layout: two-cols
-
 ---
 
 ::left::
@@ -148,36 +174,56 @@ layout: two-cols
   ]"
 />
 
+<!--
+І наш останній учасник - Данііл.
+
+Він розробив модуль нотатків і допомагав з тестуванням і виправленням багів
+-->
+
 ---
 layout: center
 ---
 
-<div class="text-6xl mb-8">📝</div>
+# 📝 Опис проєкту
 
-# Опис проєкту
-
-<div class="max-w-2xl mx-auto space-y-4 mt-8">
+<div class="max-w-4xl mx-auto space-y-4 mt-8">
   <div class="flex items-center gap-4 text-xl">
     <span class="text-orange-500 text-2xl">🎯</span>
     <span>Personal Assistant CLI</span>
   </div>
   <div class="flex items-center gap-4 text-xl">
     <span class="text-orange-500 text-2xl">📇</span>
-    <span>Керування контактами та нотатками</span>
+    <span>Керування контактами (add, search, edit, delete, birthdays)</span>
+  </div>
+  <div class="flex items-center gap-4 text-xl">
+    <span class="text-orange-500 text-2xl">📝</span>
+    <span>Керування нотатками (tags, search, sort, edit, delete)</span>
   </div>
   <div class="flex items-center gap-4 text-xl">
     <span class="text-orange-500 text-2xl">🎨</span>
-    <span>CLI інтерфейс з Rich UI</span>
+    <span>Rich UI з таблицями та кольоровим виводом</span>
   </div>
   <div class="flex items-center gap-4 text-xl">
     <span class="text-orange-500 text-2xl">⚡</span>
-    <span>Інтерактивні команди</span>
+    <span>Команди з автодоповненням та підказками при помилках</span>
   </div>
   <div class="flex items-center gap-4 text-xl">
-    <span class="text-orange-500 text-2xl">💡</span>
-    <span>Підказки при помилках команд</span>
+    <span class="text-orange-500 text-2xl">💾</span>
+    <span>JSON персистентне зберігання (contacts.json, notes.json)</span>
   </div>
 </div>
+
+<!--
+Тепер перейдемо до самого проєкту. Наш Personal Assistant CLI - це універсальний інструмент для керування контактами та нотатками.
+
+Ми реалізували повний цикл управління **контактами**: додавання, пошук, редагування, видалення та сповіщення про дні народження.
+
+Також ми створили систему **нотаток** з можливістю додавання тегів, пошуку, сортування, редагування та видалення.
+
+Особливістю нашого застосунку є інтерфейс, що використовує таблиці та кольоровий вивід для кращого сприйняття інформації.
+
+Ми впровадили систему автодоповнення та підказок при помилках у командах для підвищення зручності використання.
+-->
 
 ---
 layout: center
@@ -187,10 +233,10 @@ layout: center
 
 # Проблеми та рішення
 
-Multiline input conflict
+<!--
+Problems we have: Multiline input git conflict
 UA phone to E.164 format
-UNIT tests CI/CD
-
+UNIT tests CI/CD -->
 
 <div class="grid grid-cols-2 gap-8 max-w-5xl mx-auto mt-8">
   <div class="space-y-6">
@@ -201,11 +247,11 @@ UNIT tests CI/CD
     </div>
     <div class="flex items-center gap-3 text-lg">
       <span class="text-red-400">🚫</span>
-      <span>Структура команд</span>
+      <span>Введення команд</span>
     </div>
     <div class="flex items-center gap-3 text-lg">
       <span class="text-red-400">🚫</span>
-      <span>Обробка помилок</span>
+      <span>Обробка невірних команд</span>
     </div>
     <div class="flex items-center gap-3 text-lg">
       <span class="text-red-400">🚫</span>
@@ -221,35 +267,41 @@ UNIT tests CI/CD
     </div>
     <div class="flex items-center gap-3 text-lg">
       <span class="text-green-400">✅</span>
-      <span>Система команд</span>
+      <span>Автодоповнення команд</span>
     </div>
     <div class="flex items-center gap-3 text-lg">
       <span class="text-green-400">✅</span>
-      <span>Command suggestions</span>
+      <span>Regex validation for arguments</span>
     </div>
     <div class="flex items-center gap-3 text-lg">
       <span class="text-green-400">✅</span>
-      <span>Typed Python code</span>
+      <span>TypedDict + dataclasses</span>
     </div>
   </div>
 </div>
+
+<!--
+Під час розробки ми стикалися з певними проблемами. Найбільшими викликами були поганий UX у CLI, ускладнений процес введення команд, потреба в кращій обробці невірних команд та потреба у чіткій організації архітектури системи.
+
+
+Щоб вирішити ці проблеми, ми використали Rich UI бібліотеку для створення зручного інтерфейсу, впровадили систему автодоповнення команд (prompt_toolkit), додали regex validation для перевірки аргументів команд та застосували TypedDict та dataclasses для кращої типізації даних.
+-->
 
 ---
 layout: center
 ---
 
-<div class="text-6xl mb-8">🛠️</div>
-
-# Технології
+# 🛠️ Технології
 
 <div class="grid grid-cols-3 gap-6 max-w-5xl mx-auto mt-8">
   <div class="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border border-blue-500/20 rounded-2xl p-6">
     <div class="text-3xl mb-4">🐍</div>
     <div class="text-xl font-bold mb-2">Back-end</div>
     <div class="space-y-2 text-base opacity-90">
-      <div>• Python</div>
-      <div>• Rich</div>
-      <div>• CLI Architecture</div>
+      <div>• Python >=3.10</div>
+      <div>• Rich UI Library</div>
+      <div>• Prompt Toolkit</div>
+      <div>• TypedDict + dataclasses</div>
     </div>
   </div>
 
@@ -257,67 +309,69 @@ layout: center
     <div class="text-3xl mb-4">⚡</div>
     <div class="text-xl font-bold mb-2">Features</div>
     <div class="space-y-2 text-base opacity-90">
-      <div>• Command system</div>
-      <div>• Tables</div>
-      <div>• Interactive input</div>
-      <div>• Command suggestions</div>
+      <div>• Custom command system</div>
+      <div>• Tables with Rich</div>
+      <div>• Interactive input with prompt_toolkit</div>
+      <div>• Autocompletion and suggestions</div>
     </div>
   </div>
 
   <div class="bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-500/20 rounded-2xl p-6">
     <div class="text-3xl mb-4">🔧</div>
-    <div class="text-xl font-bold mb-2">Utilities</div>
+    <div class="text-xl font-bold mb-2">Dev Tools</div>
     <div class="space-y-2 text-base opacity-90">
-      <div>• VSCode</div>
-      <div>• Git</div>
-      <div>• GitHub</div>
+      <div>• pytest</div>
+      <div>• Ruff</div>
+      <div>• GitHub Actions</div>
+      <div>• uv Package Manager</div>
     </div>
   </div>
 </div>
 
+<!--
+Технології які ми використовували у проекті:
+- Python 3.10,
+- Rich UI Library та Prompt Toolkit для створення інтерактивного інтерфейсу
+- TypedDict та dataclasses для кращої структуризації та типізації даних
+- Для тестування ми використали pytest
+- Ruff для форматування коду
+- GitHub Actions для CI/CD
+- uv як менеджер пакетів.
+-->
+
 ---
-layout: center
+layout: image-left
+image: https://raw.githubusercontent.com/gornostay25/goit-python-final-project/refs/heads/main/docs/demo.gif
+backgroundSize: 90% 80%
 ---
 
-<div class="text-6xl mb-8">🎬</div>
-
-# Демонстрація
+# 🎬 Демонстрація
 
 <div class="bg-gray-900/50 border border-gray-700 rounded-2xl p-12 max-w-3xl mx-auto mt-8">
-  <div class="text-4xl mb-4">💻</div>
-  <div class="text-2xl font-bold text-orange-500 mb-2">CLI Demo</div>
-  <div class="text-lg opacity-80">
-    Запуск та робота команд
-  </div>
+  <div class="text-2xl font-bold text-orange-500 mb-2">💻 CLI Demo</div>
   <div class="mt-6 text-sm opacity-60">
-    <span class="bg-gray-800 px-3 py-1 rounded">$ python main.py</span>
+    <span class="bg-gray-800 px-3 py-1 rounded">$ uv run python -m app</span>
   </div>
 </div>
 
+<!--
+Тепер давайте подивимося на наш проєкт у дії
+-->
+
 ---
 layout: center
 ---
 
-<div class="text-6xl mb-8">🎉</div>
-
-# Висновок
+# 🎉 Висновок
 
 <div class="max-w-2xl mx-auto space-y-4 mt-8">
   <div class="flex items-center gap-4 text-xl">
     <span class="text-orange-500 text-2xl">✨</span>
-    <span>Створено CLI оболонку</span>
+    <span>Створено CLI застосунок зі зручним інтерфейсом</span>
   </div>
   <div class="flex items-center gap-4 text-xl">
     <span class="text-orange-500 text-2xl">🎨</span>
-    <span>Зручний інтерфейс з Rich</span>
-  </div>
-  <div class="flex items-center gap-4 text-xl">
-    <span class="text-orange-500 text-2xl">🏗️</span>
-    <span>Основа для масштабування</span>
-  </div>
-  <div class="flex items-center gap-4 text-xl">
-    <span class="text-orange-500 text-2xl">🚀</span>
-    <span>Наступний крок — реалізація бізнес-логіки</span>
+    <span>Попрактикували роботу в команді і Scrum</span>
   </div>
 </div>
 
@@ -328,4 +382,7 @@ layout: center
 <div class="mt-4 text-sm opacity-60">
   Горностайчики Team 🦄 • 2026
 </div>
-~~
+
+<!--
+Підсумовуючи, ми створили CLI-застосунок із зручним інтерфейсом, який дозволяє ефективно керувати контактами та нотатками. Окрім технічних навичок, ми також набули досвіду роботи в команді та практикували Scrum-процеси.
+-->
